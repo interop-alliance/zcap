@@ -17,9 +17,17 @@
   },
   "license": "BSD-3-Clause",
   "type": "module",
-  "exports": "./lib/index.js",
+  "exports": {
+    ".": {
+      "types": "./types/lib/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "types": "./types/lib/index.d.ts",
   "files": [
-    "lib/**/*.js"
+    "lib/**/*.js",
+    "types/**/*.d.ts",
+    "types/**/*.d.ts.map"
   ],
   "dependencies": {
     "@digitalbazaar/zcap-context": "^2.0.1",
@@ -43,6 +51,7 @@
     "karma-webpack": "^5.0.0",
     "mocha": "^10.0.0",
     "mocha-lcov-reporter": "^1.3.0",
+    "typescript": "^6.0.3",
     "webpack": "^5.73.0"
   },
   "scripts": {
@@ -53,6 +62,7 @@
     "coverage": "cross-env NODE_ENV=test c8 npm run test-node",
     "coverage-ci": "cross-env NODE_ENV=test c8 --reporter=lcovonly --reporter=text-summary --reporter=text npm run test-node",
     "coverage-report": "c8 report",
+    "build:types": "tsc",
     "lint": "eslint ."
   },
   "c8": {
