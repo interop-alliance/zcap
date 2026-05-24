@@ -6,7 +6,7 @@
 import * as zcap from '../lib/index.js';
 import chai from 'chai';
 import common from './test-common.js';
-import jsigs from 'jsonld-signatures';
+import jsigs from '@interop/jsonld-signatures';
 
 import * as helpers from './helpers.js';
 import * as mock from './mock-data.js';

@@ -1,8 +1,8 @@
 {
-  "name": "@digitalbazaar/zcap",
-  "version": "9.0.2-0",
+  "name": "@interop/zcap",
+  "version": "9.0.3",
   "description": "Authorization Capabilities reference implementation.",
-  "homepage": "https://github.com/digitalbazaar/zcap",
+  "homepage": "https://github.com/interop-alliance/zcap",
   "author": {
     "name": "Digital Bazaar, Inc.",
     "email": "support@digitalbazaar.com",
@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/digitalbazaar/zcap"
+    "url": "https://github.com/interop-alliance/zcap"
   },
   "bugs": {
     "url": "https://github.com/digitalbazaar/zcap/issues/"
@@ -22,12 +22,12 @@
     "lib/**/*.js"
   ],
   "dependencies": {
-    "@digitalbazaar/zcap-context": "^2.0.0",
-    "jsonld-signatures": "^11.0.0"
+    "@digitalbazaar/zcap-context": "^2.0.1",
+    "@interop/jsonld-signatures": "^11.6.1"
   },
   "devDependencies": {
-    "@digitalbazaar/ed25519-signature-2020": "^5.0.0",
-    "@digitalbazaar/ed25519-verification-key-2020": "^4.0.0",
+    "@digitalbazaar/ed25519-signature-2020": "^5.4.0",
+    "@digitalcredentials/ed25519-verification-key-2020": "^5.0.0",
     "c8": "^9.1.0",
     "chai": "^4.3.6",
     "cross-env": "^7.0.3",
@@ -47,8 +47,8 @@
   },
   "scripts": {
     "test": "npm run test-node",
-    "__test-node": "cross-env NODE_ENV=test mocha --preserve-symlinks --delay -t 30000 -A -R ${REPORTER:-spec} tests/test.js",
-    "test-node": "cross-env NODE_ENV=test mocha --preserve-symlinks -t 30000 -A -R ${REPORTER:-spec} tests/test.js",
+    "__test-node": "cross-env NODE_ENV=test mocha --delay -t 30000 -A -R ${REPORTER:-spec} tests/test.js",
+    "test-node": "cross-env NODE_ENV=test mocha -t 30000 -A -R ${REPORTER:-spec} tests/test.js",
     "test-karma": "cross-env NODE_ENV=test karma start karma.conf.cjs",
     "coverage": "cross-env NODE_ENV=test c8 npm run test-node",
     "coverage-ci": "cross-env NODE_ENV=test c8 --reporter=lcovonly --reporter=text-summary --reporter=text npm run test-node",
