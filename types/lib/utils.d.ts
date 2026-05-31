@@ -188,108 +188,37 @@ export function compareTime({ t1, t2, maxClockSkew }: {
     maxClockSkew: any;
 }): 0 | 1 | -1;
 /**
- * A root authorization capability (zcap). Root capabilities have no parent
- * and are identified by a `urn:zcap:root:<encodedTarget>` URI. They carry no
- * `expires` field and no delegation proof.
+ * The zcap object shapes (`RootZcap`, `DelegatedZcap`,
+ * `CapabilityDelegationProof`, `Zcap`) are defined in `./zcap-types.d.ts` and
+ * re-exported here as typedefs. They cannot be expressed as JSDoc `@typedef`s
+ * because TypeScript's JSDoc parser mangles the `@context` property name (the
+ * leading `@` becomes an empty-string key). See `./zcap-types.d.ts`.
  */
-export type RootZcap = {
-    /**
-     * '@context' - The zcap JSON-LD context URL.
-     */
-    "": string;
-    /**
-     * - Capability ID (`urn:zcap:root:<encodedTarget>`).
-     */
-    id: string;
-    /**
-     * - The DID(s) authorized to invoke.
-     */
-    controller: string | string[];
-    /**
-     * - Resource URI this capability grants
-     * access to (absolute URI).
-     */
-    invocationTarget: string;
-};
+export type RootZcap = import("./zcap-types.js").RootZcap;
 /**
- * A proof attached to a delegated capability.
+ * The zcap object shapes (`RootZcap`, `DelegatedZcap`,
+ * `CapabilityDelegationProof`, `Zcap`) are defined in `./zcap-types.d.ts` and
+ * re-exported here as typedefs. They cannot be expressed as JSDoc `@typedef`s
+ * because TypeScript's JSDoc parser mangles the `@context` property name (the
+ * leading `@` becomes an empty-string key). See `./zcap-types.d.ts`.
  */
-export type CapabilityDelegationProof = {
-    /**
-     * - The cryptographic suite type (e.g.
-     * `'Ed25519Signature2020'`).
-     */
-    type: string;
-    /**
-     * - ISO 8601 date-time the proof was created.
-     */
-    created: string;
-    /**
-     * - Verification method URI used to sign.
-     */
-    verificationMethod: string;
-    /**
-     * - Always
-     * `'capabilityDelegation'`.
-     */
-    proofPurpose: "capabilityDelegation";
-    /**
-     * - Ordered capability
-     * chain (root > parent). All entries are string IDs except the last
-     * delegated zcap, which is embedded as an object.
-     */
-    capabilityChain: Array<string | DelegatedZcap>;
-    /**
-     * - The encoded proof value.
-     */
-    proofValue: string;
-};
+export type CapabilityDelegationProof = import("./zcap-types.js").CapabilityDelegationProof;
 /**
- * A delegated authorization capability (zcap). Delegated capabilities narrow
- * a parent capability and must carry exactly one `capabilityDelegation` proof.
+ * The zcap object shapes (`RootZcap`, `DelegatedZcap`,
+ * `CapabilityDelegationProof`, `Zcap`) are defined in `./zcap-types.d.ts` and
+ * re-exported here as typedefs. They cannot be expressed as JSDoc `@typedef`s
+ * because TypeScript's JSDoc parser mangles the `@context` property name (the
+ * leading `@` becomes an empty-string key). See `./zcap-types.d.ts`.
  */
-export type DelegatedZcap = {
-    /**
-     * '@context' - JSON-LD context array; first entry MUST be
-     * the zcap context URL.
-     */
-    "": string[];
-    /**
-     * - Capability ID (absolute URI).
-     */
-    id: string;
-    /**
-     * - Parent capability ID (absolute URI).
-     */
-    parentCapability: string;
-    /**
-     * - The DID(s) authorized to invoke.
-     */
-    controller: string | string[];
-    /**
-     * - Resource URI this capability grants
-     * access to (absolute URI).
-     */
-    invocationTarget: string;
-    /**
-     * - The action(s) the controller
-     * may perform; if absent, no actions are allowed (except for the root zcap).
-     */
-    allowedAction?: string | string[];
-    /**
-     * - ISO 8601 date-time when this capability expires.
-     */
-    expires: string;
-    /**
-     * -
-     * The capability delegation proof(s).
-     */
-    proof: CapabilityDelegationProof | CapabilityDelegationProof[];
-};
+export type DelegatedZcap = import("./zcap-types.js").DelegatedZcap;
 /**
- * An authorization capability; either a root or a delegated zcap.
+ * The zcap object shapes (`RootZcap`, `DelegatedZcap`,
+ * `CapabilityDelegationProof`, `Zcap`) are defined in `./zcap-types.d.ts` and
+ * re-exported here as typedefs. They cannot be expressed as JSDoc `@typedef`s
+ * because TypeScript's JSDoc parser mangles the `@context` property name (the
+ * leading `@` becomes an empty-string key). See `./zcap-types.d.ts`.
  */
-export type Zcap = RootZcap | DelegatedZcap;
+export type Zcap = import("./zcap-types.js").Zcap;
 /**
  * An inspection function result.
  */

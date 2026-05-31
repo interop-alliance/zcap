@@ -33,8 +33,9 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
      * @param {number} [options.maxDelegationTtl=Infinity] - The maximum
      *   milliseconds to live for a delegated zcap as measured by the time
      *   difference between `expires` and `created` on the delegation proof.
-     * @param {object|object[]} options.suite - The jsonld-signature suite(s) to
-     *   use to verify the capability chain.
+     * @param {object|object[]} [options.suite] - The jsonld-signature suite(s) to
+     *   use to verify the capability chain. Required only in verify-proof mode;
+     *   unused (and omitted) when creating a delegation proof.
      * @param {Zcap} [options._verifiedParentCapability] - Private.
      * @param {Array<string|DelegatedZcap>} [options._capabilityChain] - Private.
      * @param {boolean} [options._skipLocalValidationForTesting] - Private.
@@ -49,15 +50,15 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
         maxChainLength?: number;
         maxClockSkew?: number;
         maxDelegationTtl?: number;
-        suite: object | object[];
+        suite?: object | object[];
         _verifiedParentCapability?: Zcap;
         _capabilityChain?: Array<string | DelegatedZcap>;
         _skipLocalValidationForTesting?: boolean;
     });
-    parentCapability: string | utils.Zcap;
-    _capabilityChain: (string | utils.DelegatedZcap)[];
+    parentCapability: string | import("./zcap-types.js").Zcap;
+    _capabilityChain: (string | import("./zcap-types.js").DelegatedZcap)[];
     _skipLocalValidationForTesting: boolean;
-    _verifiedParentCapability: utils.Zcap;
+    _verifiedParentCapability: import("./zcap-types.js").Zcap;
     update(proof: any, { document }: {
         document: any;
     }): Promise<any>;
@@ -97,5 +98,4 @@ export type InspectCapabilityChain = import("./utils.js").InspectCapabilityChain
 export type Zcap = import("./utils.js").Zcap;
 export type DelegatedZcap = import("./utils.js").DelegatedZcap;
 import { CapabilityProofPurpose } from './CapabilityProofPurpose.js';
-import * as utils from './utils.js';
 //# sourceMappingURL=CapabilityDelegation.d.ts.map

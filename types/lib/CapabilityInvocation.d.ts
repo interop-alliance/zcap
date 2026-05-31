@@ -44,8 +44,9 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
      * @param {number} [options.maxTimestampDelta=Infinity] - A maximum number
      *   of seconds that "created" date on the capability invocation proof can
      *   deviate from `date`, defaults to `Infinity`.
-     * @param {object|object[]} options.suite - The jsonld-signature suite(s) to
-     *   use to verify the capability chain.
+     * @param {object|object[]} [options.suite] - The jsonld-signature suite(s) to
+     *   use to verify the capability chain. Required only in verify-proof mode;
+     *   unused (and omitted) when creating an invocation proof.
      */
     constructor({ capability, capabilityAction, invocationTarget, allowTargetAttenuation, controller, date, expectedAction, expectedRootCapability, expectedTarget, inspectCapabilityChain, maxChainLength, maxClockSkew, maxDelegationTtl, maxTimestampDelta, suite }?: {
         capability?: string | DelegatedZcap;
@@ -62,9 +63,9 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
         maxClockSkew?: number;
         maxDelegationTtl?: number;
         maxTimestampDelta?: number;
-        suite: object | object[];
+        suite?: object | object[];
     });
-    capability: string | utils.DelegatedZcap;
+    capability: string | import("./zcap-types.js").DelegatedZcap;
     capabilityAction: string;
     invocationTarget: string;
     expectedTarget: string | string[];
@@ -95,6 +96,5 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
 export type InspectCapabilityChain = import("./utils.js").InspectCapabilityChain;
 export type DelegatedZcap = import("./utils.js").DelegatedZcap;
 import { CapabilityProofPurpose } from './CapabilityProofPurpose.js';
-import * as utils from './utils.js';
 import { CapabilityDelegation } from './CapabilityDelegation.js';
 //# sourceMappingURL=CapabilityInvocation.d.ts.map
