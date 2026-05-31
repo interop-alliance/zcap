@@ -1,8 +1,4 @@
 /**
- * @typedef {import('./utils.js').RootZcap} RootZcap
- * @typedef {import('./utils.js').DelegatedZcap} DelegatedZcap
- * @typedef {import('./utils.js').Zcap} Zcap
- * @typedef {import('./utils.js').CapabilityDelegationProof} CapabilityDelegationProof
  * @typedef {import('./utils.js').InspectCapabilityChain} InspectCapabilityChain
  * @typedef {import('./utils.js').InspectResult} InspectResult
  * @typedef {import('./utils.js').CapabilityChainDetails} CapabilityChainDetails
@@ -35,10 +31,6 @@ export { constants };
  * @type {Function}
  */
 export const documentLoader: Function;
-export type RootZcap = import("./utils.js").RootZcap;
-export type DelegatedZcap = import("./utils.js").DelegatedZcap;
-export type Zcap = import("./utils.js").Zcap;
-export type CapabilityDelegationProof = import("./utils.js").CapabilityDelegationProof;
 export type InspectCapabilityChain = import("./utils.js").InspectCapabilityChain;
 export type InspectResult = import("./utils.js").InspectResult;
 export type CapabilityChainDetails = import("./utils.js").CapabilityChainDetails;

@@ -1,12 +1,12 @@
 /**
  * @typedef {import('./utils.js').InspectCapabilityChain} InspectCapabilityChain
- * @typedef {import('./utils.js').Zcap} Zcap
- * @typedef {import('./utils.js').DelegatedZcap} DelegatedZcap
+ * @typedef {import('./utils.js').IZcap} IZcap
+ * @typedef {import('./utils.js').IDelegatedZcap} IDelegatedZcap
  */
 export class CapabilityDelegation extends CapabilityProofPurpose {
     /**
      * @param {object} options - The options.
-     * @param {string|Zcap} [options.parentCapability] - An alternative to
+     * @param {string|IZcap} [options.parentCapability] - An alternative to
      *   passing `capabilityChain` when creating a proof; passing
      *   `parentCapability` will enable the capability chain to be auto-computed.
      *   Pass a root zcap ID string, or a full root or delegated zcap object.
@@ -36,12 +36,12 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
      * @param {object|object[]} [options.suite] - The jsonld-signature suite(s) to
      *   use to verify the capability chain. Required only in verify-proof mode;
      *   unused (and omitted) when creating a delegation proof.
-     * @param {Zcap} [options._verifiedParentCapability] - Private.
-     * @param {Array<string|DelegatedZcap>} [options._capabilityChain] - Private.
+     * @param {IZcap} [options._verifiedParentCapability] - Private.
+     * @param {Array<string|IDelegatedZcap>} [options._capabilityChain] - Private.
      * @param {boolean} [options._skipLocalValidationForTesting] - Private.
      */
     constructor({ parentCapability, allowTargetAttenuation, controller, date, expectedRootCapability, inspectCapabilityChain, maxChainLength, maxClockSkew, maxDelegationTtl, suite, _verifiedParentCapability, _capabilityChain, _skipLocalValidationForTesting }?: {
-        parentCapability?: string | Zcap;
+        parentCapability?: string | IZcap;
         allowTargetAttenuation?: boolean;
         date?: string | Date | number;
         expectedRootCapability?: string | string[];
@@ -51,14 +51,14 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
         maxClockSkew?: number;
         maxDelegationTtl?: number;
         suite?: object | object[];
-        _verifiedParentCapability?: Zcap;
-        _capabilityChain?: Array<string | DelegatedZcap>;
+        _verifiedParentCapability?: IZcap;
+        _capabilityChain?: Array<string | IDelegatedZcap>;
         _skipLocalValidationForTesting?: boolean;
     });
-    parentCapability: string | import("./zcap-types.js").Zcap;
-    _capabilityChain: (string | import("./zcap-types.js").DelegatedZcap)[];
+    parentCapability: string | import("@digitalcredentials/ssi/zcap").IZcap;
+    _capabilityChain: (string | import("@digitalcredentials/ssi/zcap").IDelegatedZcap)[];
     _skipLocalValidationForTesting: boolean;
-    _verifiedParentCapability: import("./zcap-types.js").Zcap;
+    _verifiedParentCapability: import("@digitalcredentials/ssi/zcap").IZcap;
     update(proof: any, { document }: {
         document: any;
     }): Promise<any>;
@@ -95,7 +95,7 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
     }): Promise<import("@interop/jsonld-signatures").ProofValidateResult>;
 }
 export type InspectCapabilityChain = import("./utils.js").InspectCapabilityChain;
-export type Zcap = import("./utils.js").Zcap;
-export type DelegatedZcap = import("./utils.js").DelegatedZcap;
+export type IZcap = import("./utils.js").IZcap;
+export type IDelegatedZcap = import("./utils.js").IDelegatedZcap;
 import { CapabilityProofPurpose } from './CapabilityProofPurpose.js';
 //# sourceMappingURL=CapabilityDelegation.d.ts.map

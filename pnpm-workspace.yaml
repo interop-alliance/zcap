@@ -1,0 +1,2 @@
+minimumReleaseAgeExclude:
+  - '@digitalcredentials/ssi@5.5.0'

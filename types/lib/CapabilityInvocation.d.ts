@@ -1,11 +1,11 @@
 /**
  * @typedef {import('./utils.js').InspectCapabilityChain} InspectCapabilityChain
- * @typedef {import('./utils.js').DelegatedZcap} DelegatedZcap
+ * @typedef {import('./utils.js').IDelegatedZcap} IDelegatedZcap
  */
 export class CapabilityInvocation extends CapabilityProofPurpose {
     /**
      * @param {object} options - The options.
-     * @param {string|DelegatedZcap} [options.capability] - The capability to
+     * @param {string|IDelegatedZcap} [options.capability] - The capability to
      *   add/reference in a created proof. A root zcap MUST be passed as its ID
      *   string; a delegated zcap must be passed as the full object.
      * @param {string} [options.capabilityAction] - The capability action that is
@@ -49,7 +49,7 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
      *   unused (and omitted) when creating an invocation proof.
      */
     constructor({ capability, capabilityAction, invocationTarget, allowTargetAttenuation, controller, date, expectedAction, expectedRootCapability, expectedTarget, inspectCapabilityChain, maxChainLength, maxClockSkew, maxDelegationTtl, maxTimestampDelta, suite }?: {
-        capability?: string | DelegatedZcap;
+        capability?: string | IDelegatedZcap;
         capabilityAction?: string;
         invocationTarget?: string;
         allowTargetAttenuation?: boolean;
@@ -65,7 +65,7 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
         maxTimestampDelta?: number;
         suite?: object | object[];
     });
-    capability: string | import("./zcap-types.js").DelegatedZcap;
+    capability: string | import("@digitalcredentials/ssi/zcap").IDelegatedZcap;
     capabilityAction: string;
     invocationTarget: string;
     expectedTarget: string | string[];
@@ -94,7 +94,7 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     }): Promise<import("@interop/jsonld-signatures").ProofValidateResult>;
 }
 export type InspectCapabilityChain = import("./utils.js").InspectCapabilityChain;
-export type DelegatedZcap = import("./utils.js").DelegatedZcap;
+export type IDelegatedZcap = import("./utils.js").IDelegatedZcap;
 import { CapabilityProofPurpose } from './CapabilityProofPurpose.js';
 import { CapabilityDelegation } from './CapabilityDelegation.js';
 //# sourceMappingURL=CapabilityInvocation.d.ts.map

@@ -6,59 +6,59 @@
  * @param {string|string[]} options.controller - The root controller.
  * @param {string} options.invocationTarget - The root invocation target.
  *
- * @returns {RootZcap} The root capability.
+ * @returns {IRootZcap} The root capability.
  */
 export function createRootCapability({ controller, invocationTarget }: {
     controller: string | string[];
     invocationTarget: string;
-}): RootZcap;
+}): IRootZcap;
 /**
  * Retrieves the controller(s) from a capability.
  *
  * @param {object} options - The options.
- * @param {Zcap} options.capability - The authorization capability (zcap).
+ * @param {IZcap} options.capability - The authorization capability (zcap).
  *
  * @returns {string[]} The controller(s) for the capability.
  */
 export function getControllers({ capability }: {
-    capability: Zcap;
+    capability: IZcap;
 }): string[];
 /**
  * Returns true if the given verification method is a controller (or is
  * controlled by a controller) of the given capability.
  *
  * @param {object} options - The options.
- * @param {Zcap} options.capability - The authorization capability (zcap).
+ * @param {IZcap} options.capability - The authorization capability (zcap).
  * @param {object} options.verificationMethod - The verification method to
  *   check.
  *
  * @returns {boolean} `true` if the controller matches, `false` if not.
  */
 export function isController({ capability, verificationMethod }: {
-    capability: Zcap;
+    capability: IZcap;
     verificationMethod: object;
 }): boolean;
 /**
  * Retrieves the allowed actions from a capability.
  *
  * @param {object} options - The options.
- * @param {Zcap} options.capability - The authorization capability (zcap).
+ * @param {IZcap} options.capability - The authorization capability (zcap).
  *
  * @returns {string[]} Allowed actions.
  */
 export function getAllowedActions({ capability }: {
-    capability: Zcap;
+    capability: IZcap;
 }): string[];
 /**
  * Retrieves the target from a capability.
  *
  * @param {object} options - The options.
- * @param {Zcap} options.capability - The authorization capability (zcap).
+ * @param {IZcap} options.capability - The authorization capability (zcap).
  *
  * @returns {string} - Capability target.
  */
 export function getTarget({ capability }: {
-    capability: Zcap;
+    capability: IZcap;
 }): string;
 /**
  * Retrieves the delegation proof(s) for a capability that is associated with
@@ -66,26 +66,26 @@ export function getTarget({ capability }: {
  * delegation proofs will cause this function to return an empty array.
  *
  * @param {object} options - The options.
- * @param {Zcap} options.capability - The authorization capability.
+ * @param {IZcap} options.capability - The authorization capability.
  *
- * @returns {CapabilityDelegationProof[]} Any `capabilityDelegation` proof
+ * @returns {ICapabilityDelegationProof[]} Any `capabilityDelegation` proof
  *   objects attached to the given capability.
  */
 export function getDelegationProofs({ capability }: {
-    capability: Zcap;
-}): CapabilityDelegationProof[];
+    capability: IZcap;
+}): ICapabilityDelegationProof[];
 /**
  * Gets the `capabilityChain` associated with the given capability.
  *
  * @param {object} options - The options.
- * @param {Zcap} options.capability - The authorization capability.
+ * @param {IZcap} options.capability - The authorization capability.
  *
- * @returns {Array<string|DelegatedZcap>} The capability chain entries
+ * @returns {Array<string|IDelegatedZcap>} The capability chain entries
  *   (root to parent), as stored in the delegation proof.
  */
 export function getCapabilityChain({ capability }: {
-    capability: Zcap;
-}): Array<string | DelegatedZcap>;
+    capability: IZcap;
+}): Array<string | IDelegatedZcap>;
 /**
  * Determines if the given `invocationTarget` is valid given a
  * `baseInvocationTarget`.
@@ -116,18 +116,18 @@ export function isValidTarget({ invocationTarget, baseInvocationTarget, allowTar
  * given `parentCapability`.
  *
  * @param {object} options - The options.
- * @param {string|Zcap} options.parentCapability - The parent capability from
+ * @param {string|IZcap} options.parentCapability - The parent capability from
  *   which to compute the capability chain (a root zcap ID string, or a full
  *   root or delegated zcap object).
  * @param {boolean} options._skipLocalValidationForTesting - Private.
  *
- * @returns {Array<string|DelegatedZcap>} The computed capability chain to be
+ * @returns {Array<string|IDelegatedZcap>} The computed capability chain to be
  *   included in a capability delegation proof.
  */
 export function computeCapabilityChain({ parentCapability, _skipLocalValidationForTesting }: {
-    parentCapability: string | Zcap;
+    parentCapability: string | IZcap;
     _skipLocalValidationForTesting: boolean;
-}): Array<string | DelegatedZcap>;
+}): Array<string | IDelegatedZcap>;
 /**
  * Dereferences the capability chain associated with the given capability,
  * ensuring it passes a number of validation checks.
@@ -152,7 +152,7 @@ export function computeCapabilityChain({ parentCapability, _skipLocalValidationF
  * work with both root zcap `a` and `b`).
  *
  * @param {object} options - The options.
- * @param {string|DelegatedZcap} options.capability - The authorization
+ * @param {string|IDelegatedZcap} options.capability - The authorization
  *   capability to dereference the chain for. Pass a string (the root zcap ID)
  *   to dereference a root zcap directly, or a delegated zcap object.
  * @param {Function} options.getRootCapability - A function for dereferencing
@@ -161,15 +161,15 @@ export function computeCapabilityChain({ parentCapability, _skipLocalValidationF
  * @param {number} [options.maxChainLength=10] - The maximum length of the
  *   capability delegation chain (this is inclusive of `capability` itself).
  *
- * @returns {Promise<{dereferencedChain: Zcap[]}>} Resolves to an object
+ * @returns {Promise<{dereferencedChain: IZcap[]}>} Resolves to an object
  *   containing the full dereferenced chain ordered root to tail.
  */
 export function dereferenceCapabilityChain({ capability, getRootCapability, maxChainLength }: {
-    capability: string | DelegatedZcap;
+    capability: string | IDelegatedZcap;
     getRootCapability: Function;
     maxChainLength?: number;
 }): Promise<{
-    dereferencedChain: Zcap[];
+    dereferencedChain: IZcap[];
 }>;
 export function checkProofContext({ proof }: {
     proof: any;
@@ -188,37 +188,29 @@ export function compareTime({ t1, t2, maxClockSkew }: {
     maxClockSkew: any;
 }): 0 | 1 | -1;
 /**
- * The zcap object shapes (`RootZcap`, `DelegatedZcap`,
- * `CapabilityDelegationProof`, `Zcap`) are defined in `./zcap-types.d.ts` and
- * re-exported here as typedefs. They cannot be expressed as JSDoc `@typedef`s
- * because TypeScript's JSDoc parser mangles the `@context` property name (the
- * leading `@` becomes an empty-string key). See `./zcap-types.d.ts`.
+ * The zcap object shapes (`IRootZcap`, `IDelegatedZcap`,
+ * `ICapabilityDelegationProof`, `IZcap`) live in `@digitalcredentials/ssi/zcap`
+ * (the canonical home) and are re-imported here as typedefs for JSDoc use.
  */
-export type RootZcap = import("./zcap-types.js").RootZcap;
+export type IRootZcap = import("@digitalcredentials/ssi/zcap").IRootZcap;
 /**
- * The zcap object shapes (`RootZcap`, `DelegatedZcap`,
- * `CapabilityDelegationProof`, `Zcap`) are defined in `./zcap-types.d.ts` and
- * re-exported here as typedefs. They cannot be expressed as JSDoc `@typedef`s
- * because TypeScript's JSDoc parser mangles the `@context` property name (the
- * leading `@` becomes an empty-string key). See `./zcap-types.d.ts`.
+ * The zcap object shapes (`IRootZcap`, `IDelegatedZcap`,
+ * `ICapabilityDelegationProof`, `IZcap`) live in `@digitalcredentials/ssi/zcap`
+ * (the canonical home) and are re-imported here as typedefs for JSDoc use.
  */
-export type CapabilityDelegationProof = import("./zcap-types.js").CapabilityDelegationProof;
+export type ICapabilityDelegationProof = import("@digitalcredentials/ssi/zcap").ICapabilityDelegationProof;
 /**
- * The zcap object shapes (`RootZcap`, `DelegatedZcap`,
- * `CapabilityDelegationProof`, `Zcap`) are defined in `./zcap-types.d.ts` and
- * re-exported here as typedefs. They cannot be expressed as JSDoc `@typedef`s
- * because TypeScript's JSDoc parser mangles the `@context` property name (the
- * leading `@` becomes an empty-string key). See `./zcap-types.d.ts`.
+ * The zcap object shapes (`IRootZcap`, `IDelegatedZcap`,
+ * `ICapabilityDelegationProof`, `IZcap`) live in `@digitalcredentials/ssi/zcap`
+ * (the canonical home) and are re-imported here as typedefs for JSDoc use.
  */
-export type DelegatedZcap = import("./zcap-types.js").DelegatedZcap;
+export type IDelegatedZcap = import("@digitalcredentials/ssi/zcap").IDelegatedZcap;
 /**
- * The zcap object shapes (`RootZcap`, `DelegatedZcap`,
- * `CapabilityDelegationProof`, `Zcap`) are defined in `./zcap-types.d.ts` and
- * re-exported here as typedefs. They cannot be expressed as JSDoc `@typedef`s
- * because TypeScript's JSDoc parser mangles the `@context` property name (the
- * leading `@` becomes an empty-string key). See `./zcap-types.d.ts`.
+ * The zcap object shapes (`IRootZcap`, `IDelegatedZcap`,
+ * `ICapabilityDelegationProof`, `IZcap`) live in `@digitalcredentials/ssi/zcap`
+ * (the canonical home) and are re-imported here as typedefs for JSDoc use.
  */
-export type Zcap = import("./zcap-types.js").Zcap;
+export type IZcap = import("@digitalcredentials/ssi/zcap").IZcap;
 /**
  * An inspection function result.
  */

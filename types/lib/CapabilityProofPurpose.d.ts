@@ -78,7 +78,7 @@ export class CapabilityProofPurpose extends jsigs.ControllerProofPurpose {
         documentLoader: any;
         proof: any;
     }): Promise<{
-        dereferencedChain: import("./zcap-types.js").Zcap[];
+        dereferencedChain: import("@digitalcredentials/ssi/zcap").IZcap[];
     }>;
     _getCapabilityDelegationClass(): void;
     _getTailCapability(): Promise<void>;

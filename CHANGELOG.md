@@ -1,6 +1,13 @@
 # @interop/zcap ChangeLog
 
-## 9.1.0 -
+## 10.0.0 -
+
+### Changed
+- **BREAKING**: Extract `ZCap` related types to `@digitalcredentials/ssi@5.5.0`.
+  Do not re-export types from `@interop/zcap` -- consumers must use `ssi`
+  instead.
+
+## 9.0.3 - 2026-05-31
 
 ### Changed
 - **BREAKING**: Forked from `@digitalbazaar/zcap@9.0.1` to `@interop/zcap`.
