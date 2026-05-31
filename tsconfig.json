@@ -13,6 +13,6 @@
     "strict": false,
     "target": "ES2020"
   },
-  "include": ["lib/**/*.js"],
+  "include": ["lib/**/*.js", "lib/**/*.d.ts"],
   "exclude": ["node_modules", "tests"]
 }

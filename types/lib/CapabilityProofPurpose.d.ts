@@ -32,8 +32,9 @@ export class CapabilityProofPurpose extends jsigs.ControllerProofPurpose {
      * @param {number} [options.maxTimestampDelta=Infinity] - A maximum number
      *   of seconds that a capability invocation proof (only used by this proof
      *   type) "created" date can deviate from `date`, defaults to `Infinity`.
-     * @param {object|object[]} options.suite - The jsonld-signature suite(s) to
-     *   use to verify the capability chain.
+     * @param {object|object[]} [options.suite] - The jsonld-signature suite(s) to
+     *   use to verify the capability chain. Required only when verifying a proof;
+     *   unused (and omitted) when creating a delegation proof.
      * @param {string} options.term - The term `capabilityInvocation` or
      *   `capabilityDelegation` to look for in an LD proof.
      */
@@ -47,7 +48,7 @@ export class CapabilityProofPurpose extends jsigs.ControllerProofPurpose {
         maxClockSkew?: number;
         maxDelegationTtl?: number;
         maxTimestampDelta?: number;
-        suite: object | object[];
+        suite?: object | object[];
         term: string;
     });
     allowTargetAttenuation: boolean;
@@ -57,16 +58,27 @@ export class CapabilityProofPurpose extends jsigs.ControllerProofPurpose {
     maxClockSkew: number;
     maxDelegationTtl: number;
     suite: any;
-    validate(proof: any, validateOptions: any): Promise<void | {
-        valid: boolean;
-        error: any;
-    }>;
+    /**
+     * Validates a capability proof by verifying its capability delegation chain
+     * from the root outward. Overrides
+     * {@link jsigs.ControllerProofPurpose#validate} and is structurally
+     * compatible with it.
+     *
+     * @param {object} proof - The proof to validate.
+     * @param {object} validateOptions - The validation options (passed through
+     *   from `jsigs`), including `document` and `documentLoader`.
+     *
+     * @returns {Promise<import('@interop/jsonld-signatures').
+     *   ProofValidateResult>} Resolves to `{valid, error?}` (plus an internal
+     *   `dereferencedChain` on success).
+     */
+    validate(proof: object, validateOptions: object): Promise<import("@interop/jsonld-signatures").ProofValidateResult>;
     _dereferenceChain({ document, documentLoader, proof }: {
         document: any;
         documentLoader: any;
         proof: any;
     }): Promise<{
-        dereferencedChain: utils.Zcap[];
+        dereferencedChain: import("./zcap-types.js").Zcap[];
     }>;
     _getCapabilityDelegationClass(): void;
     _getTailCapability(): Promise<void>;
@@ -111,5 +123,4 @@ export class CapabilityProofPurpose extends jsigs.ControllerProofPurpose {
 export type InspectCapabilityChain = import("./utils.js").InspectCapabilityChain;
 export type CapabilityMeta = import("./utils.js").CapabilityMeta;
 import jsigs from '@interop/jsonld-signatures';
-import * as utils from './utils.js';
 //# sourceMappingURL=CapabilityProofPurpose.d.ts.map

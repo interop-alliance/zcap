@@ -26,6 +26,7 @@
   "types": "./types/lib/index.d.ts",
   "files": [
     "lib/**/*.js",
+    "lib/**/*.d.ts",
     "types/**/*.d.ts",
     "types/**/*.d.ts.map"
   ],
