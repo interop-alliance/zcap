@@ -1,6 +1,6 @@
 # @interop/zcap ChangeLog
 
-## 10.0.0 - 2026-05-31
+## 10.0.0-10.0.1 - 2026-05-31
 
 ### Changed
 - **BREAKING**: Extract `ZCap` related types to `@digitalcredentials/ssi@5.5.0`.
