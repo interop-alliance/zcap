@@ -1,6 +1,6 @@
 # zcap _(@interop/zcap)_
 
-[![Node.js CI](https://github.com/interop-alliance/zcap/workflows/CI/badge.svg)](https://github.com/interop-alliance/zcap/actions?query=workflow%3A%22CI%22)
+[![CI](https://github.com/interop-alliance/zcap/workflows/CI/badge.svg)](https://github.com/interop-alliance/zcap/actions?query=workflow%3ACI)
 [![NPM Version](https://img.shields.io/npm/v/@interop/zcap.svg)](https://npm.im/@interop/zcap)
 
 > JavaScript reference implementation for
