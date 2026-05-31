@@ -1,8 +1,7 @@
-# zcap _(@digitalbazaar/zcap)_
+# zcap _(@interop/zcap)_
 
-[![Build status](https://img.shields.io/github/actions/workflow/status/digitalbazaar/zcap/main.yml?branch=main)](https://github.com/digitalbazaar/zcap/actions?query=workflow%3A%22Node.js+CI%22)
-[![Coverage status](https://img.shields.io/codecov/c/github/digitalbazaar/zcap)](https://codecov.io/gh/digitalbazaar/zcap)
-[![NPM Version](https://img.shields.io/npm/v/@digitalbazaar/zcap.svg)](https://npm.im/@digitalbazaar/zcap)
+[![Node.js CI](https://github.com/interop-alliance/zcap/workflows/CI/badge.svg)](https://github.com/interop-alliance/zcap/actions?query=workflow%3A%22CI%22)
+[![NPM Version](https://img.shields.io/npm/v/@interop/zcap.svg)](https://npm.im/@interop/zcap)
 
 > JavaScript reference implementation for
 [Authorization Capabilities](https://w3c-ccg.github.io/zcap-spec/).
@@ -32,13 +31,13 @@ TBD
 To install from NPM:
 
 ```sh
-npm install @digitalbazaar/zcap
+npm install @interop/zcap
 ```
 
 To install locally (for development):
 
 ```sh
-git clone https://github.com/digitalbazaar/zcap.git
+git clone https://github.com/interop-alliance/zcap.git
 cd zcap
 npm install
 ```
@@ -49,7 +48,7 @@ TBD
 
 ## Contribute
 
-See [the contribute file](https://github.com/digitalbazaar/bedrock/blob/master/CONTRIBUTING.md)!
+See [the contribute file](https://github.com/interop-alliance/bedrock/blob/master/CONTRIBUTING.md)!
 
 PRs accepted.
 
@@ -59,7 +58,7 @@ If editing the Readme, please conform to the
 ## Commercial Support
 
 Commercial support for this library is available upon request from
-Digital Bazaar: support@digitalbazaar.com
+Digital Bazaar: support@interop.com
 
 ## License
 

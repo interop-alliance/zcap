@@ -1,4 +1,10 @@
-# @digitalbazaar/zcap ChangeLog
+# @interop/zcap ChangeLog
+
+## 9.1.0 -
+
+### Changed
+- **BREAKING**: Forked from `@digitalbazaar/zcap@9.0.1` to `@interop/zcap`.
+- Updated to use `@interop/jsonld-signatures` dep.
 
 ## 9.0.1 - 2024-03-29
 
