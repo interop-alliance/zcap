@@ -1,6 +1,6 @@
 # @interop/zcap ChangeLog
 
-## 10.1.0 - TBD
+## 10.1.0 - 2026-06-01
 
 ### Changed
 - **BREAKING**: Migrate zcap type imports from `@digitalcredentials/ssi@5.5.0`
