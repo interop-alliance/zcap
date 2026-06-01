@@ -65,7 +65,7 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
         maxTimestampDelta?: number;
         suite?: object | object[];
     });
-    capability: string | import("@digitalcredentials/ssi/zcap").IDelegatedZcap;
+    capability: string | import("@interop/data-integrity-core/zcap").IDelegatedZcap;
     capabilityAction: string;
     invocationTarget: string;
     expectedTarget: string | string[];

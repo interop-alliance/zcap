@@ -55,10 +55,10 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
         _capabilityChain?: Array<string | IDelegatedZcap>;
         _skipLocalValidationForTesting?: boolean;
     });
-    parentCapability: string | import("@digitalcredentials/ssi/zcap").IZcap;
-    _capabilityChain: (string | import("@digitalcredentials/ssi/zcap").IDelegatedZcap)[];
+    parentCapability: string | import("@interop/data-integrity-core/zcap").IZcap;
+    _capabilityChain: (string | import("@interop/data-integrity-core/zcap").IDelegatedZcap)[];
     _skipLocalValidationForTesting: boolean;
-    _verifiedParentCapability: import("@digitalcredentials/ssi/zcap").IZcap;
+    _verifiedParentCapability: import("@interop/data-integrity-core/zcap").IZcap;
     update(proof: any, { document }: {
         document: any;
     }): Promise<any>;
