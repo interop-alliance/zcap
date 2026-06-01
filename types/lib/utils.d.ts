@@ -189,28 +189,32 @@ export function compareTime({ t1, t2, maxClockSkew }: {
 }): 0 | 1 | -1;
 /**
  * The zcap object shapes (`IRootZcap`, `IDelegatedZcap`,
- * `ICapabilityDelegationProof`, `IZcap`) live in `@digitalcredentials/ssi/zcap`
- * (the canonical home) and are re-imported here as typedefs for JSDoc use.
+ * `ICapabilityDelegationProof`, `IZcap`) live in
+ * `@interop/data-integrity-core/zcap` (the canonical home) and are re-imported
+ * here as typedefs for JSDoc use.
  */
-export type IRootZcap = import("@digitalcredentials/ssi/zcap").IRootZcap;
+export type IRootZcap = import("@interop/data-integrity-core/zcap").IRootZcap;
 /**
  * The zcap object shapes (`IRootZcap`, `IDelegatedZcap`,
- * `ICapabilityDelegationProof`, `IZcap`) live in `@digitalcredentials/ssi/zcap`
- * (the canonical home) and are re-imported here as typedefs for JSDoc use.
+ * `ICapabilityDelegationProof`, `IZcap`) live in
+ * `@interop/data-integrity-core/zcap` (the canonical home) and are re-imported
+ * here as typedefs for JSDoc use.
  */
-export type ICapabilityDelegationProof = import("@digitalcredentials/ssi/zcap").ICapabilityDelegationProof;
+export type ICapabilityDelegationProof = import("@interop/data-integrity-core/zcap").ICapabilityDelegationProof;
 /**
  * The zcap object shapes (`IRootZcap`, `IDelegatedZcap`,
- * `ICapabilityDelegationProof`, `IZcap`) live in `@digitalcredentials/ssi/zcap`
- * (the canonical home) and are re-imported here as typedefs for JSDoc use.
+ * `ICapabilityDelegationProof`, `IZcap`) live in
+ * `@interop/data-integrity-core/zcap` (the canonical home) and are re-imported
+ * here as typedefs for JSDoc use.
  */
-export type IDelegatedZcap = import("@digitalcredentials/ssi/zcap").IDelegatedZcap;
+export type IDelegatedZcap = import("@interop/data-integrity-core/zcap").IDelegatedZcap;
 /**
  * The zcap object shapes (`IRootZcap`, `IDelegatedZcap`,
- * `ICapabilityDelegationProof`, `IZcap`) live in `@digitalcredentials/ssi/zcap`
- * (the canonical home) and are re-imported here as typedefs for JSDoc use.
+ * `ICapabilityDelegationProof`, `IZcap`) live in
+ * `@interop/data-integrity-core/zcap` (the canonical home) and are re-imported
+ * here as typedefs for JSDoc use.
  */
-export type IZcap = import("@digitalcredentials/ssi/zcap").IZcap;
+export type IZcap = import("@interop/data-integrity-core/zcap").IZcap;
 /**
  * An inspection function result.
  */

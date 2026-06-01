@@ -1,2 +1,2 @@
 minimumReleaseAgeExclude:
-  - '@digitalcredentials/ssi@5.5.0'
+  - '@interop/data-integrity-core@6.1.0'

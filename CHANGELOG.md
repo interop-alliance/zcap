@@ -1,5 +1,14 @@
 # @interop/zcap ChangeLog
 
+## 10.1.0 - TBD
+
+### Changed
+- **BREAKING**: Migrate zcap type imports from `@digitalcredentials/ssi@5.5.0`
+  to `@interop/data-integrity-core@6.1.0` (the renamed/refactored successor).
+  The `ZCap` types (`IRootZcap`, `IDelegatedZcap`, `ICapabilityDelegationProof`,
+  `IZcap`) now live at `@interop/data-integrity-core/zcap`; consumers must use
+  `@interop/data-integrity-core` instead of `ssi`.
+
 ## 10.0.0-10.0.2 - 2026-05-31
 
 ### Changed

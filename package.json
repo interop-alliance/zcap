@@ -32,8 +32,8 @@
   ],
   "dependencies": {
     "@digitalbazaar/zcap-context": "^2.0.1",
-    "@digitalcredentials/ssi": "^5.5.0",
-    "@interop/jsonld-signatures": "^11.6.1"
+    "@interop/data-integrity-core": "^6.1.0",
+    "@interop/jsonld-signatures": "^11.6.2"
   },
   "devDependencies": {
     "@digitalbazaar/ed25519-signature-2020": "^5.4.0",
