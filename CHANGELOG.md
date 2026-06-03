@@ -1,6 +1,6 @@
 # @interop/zcap ChangeLog
 
-## 11.0.1 - TBD
+## 11.0.1 - 2026-06-02
 
 ### Fixed
 - Fix `CapabilityDelegation.update()` throwing `Cannot use 'in' operator` when
