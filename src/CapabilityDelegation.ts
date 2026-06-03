@@ -6,14 +6,15 @@ import {
   CapabilityProofPurpose,
   type CapabilityDelegationConstructor
 } from './CapabilityProofPurpose.js'
-import type { IProofDescription } from '@interop/jsonld-signatures'
+import type {
+  IProofDescription,
+  IVerificationMethod
+} from '@interop/jsonld-signatures'
+import type { IDelegatedZcap, IZcap } from '@interop/data-integrity-core/zcap'
 import type {
   CapabilityDelegationOptions,
   CapabilityMeta,
   CapabilityValidateResult,
-  IDelegatedZcap,
-  IVerificationMethod,
-  IZcap,
   ValidateOptions
 } from './types.js'
 

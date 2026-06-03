@@ -7,15 +7,16 @@ import {
   ZCAP_ROOT_PREFIX
 } from './constants.js'
 import type {
-  GetRootCapability,
+  IProofDescription,
+  IVerificationMethod
+} from '@interop/jsonld-signatures'
+import type {
   ICapabilityDelegationProof,
   IDelegatedZcap,
-  IProofDescription,
   IRootZcap,
-  IVerificationMethod,
-  IZcap,
-  ZcapError
-} from './types.js'
+  IZcap
+} from '@interop/data-integrity-core/zcap'
+import type { GetRootCapability, ZcapError } from './types.js'
 
 /**
  * Creates a root capability from a root controller and a root invocation
@@ -99,15 +100,10 @@ export function getAllowedActions({
 }: {
   capability: IZcap
 }): string[] {
-  const allowedAction =
-    'allowedAction' in capability ? capability.allowedAction : undefined
-  if (!allowedAction) {
+  if (!('allowedAction' in capability) || !capability.allowedAction) {
     return []
   }
-  if (Array.isArray(allowedAction)) {
-    return allowedAction
-  }
-  return [allowedAction]
+  return [capability.allowedAction].flat()
 }
 
 /**
@@ -673,9 +669,10 @@ export function checkCapability({
   const { id, invocationTarget } = capability
   const parentCapability =
     'parentCapability' in capability ? capability.parentCapability : undefined
-  const allowedAction =
-    'allowedAction' in capability ? capability.allowedAction : undefined
-  const expires = 'expires' in capability ? capability.expires : undefined
+  // read `allowedAction`/`expires` from the actual capability regardless of
+  // kind: a root zcap must be rejected if it carries `expires`, and its
+  // `allowedAction` shape must still be validated.
+  const { allowedAction, expires } = capability as Partial<IDelegatedZcap>
 
   const isRoot = parentCapability === undefined
   if (isRoot) {

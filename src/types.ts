@@ -2,7 +2,6 @@
  * Copyright (c) 2018-2024 Digital Bazaar, Inc. All rights reserved.
  */
 import type {
-  ICapabilityDelegationProof,
   IDelegatedZcap,
   IRootZcap,
   IZcap
@@ -13,21 +12,6 @@ import type {
   IVerificationMethod,
   LinkedDataProof
 } from '@interop/jsonld-signatures'
-
-// Re-export the canonical zcap + loader interfaces so downstream consumers can
-// import them from `@interop/zcap` directly. The shapes themselves live in
-// `@interop/data-integrity-core` so the whole ecosystem agrees on one
-// definition.
-export type {
-  ICapabilityDelegationProof,
-  IDelegatedZcap,
-  IRootZcap,
-  IZcap,
-  IDocumentLoader,
-  IProofDescription,
-  IVerificationMethod,
-  LinkedDataProof
-}
 
 /**
  * A verifier-supplied, trusted hook for dereferencing a root capability. The
