@@ -1,5 +1,14 @@
 # @interop/zcap ChangeLog
 
+## 11.0.1 - TBD
+
+### Fixed
+- Fix `CapabilityDelegation.update()` throwing `Cannot use 'in' operator` when
+  `parentCapability` is passed as a root zcap **ID string** (the documented
+  form for delegating a root capability). A string parent is now treated as a
+  root zcap (no `allowedAction`, `expires`, or delegation proof) instead of
+  being cast to an object and probed with `in`.
+
 ## 11.0.0 - 2026-06-02
 
 ### Changed

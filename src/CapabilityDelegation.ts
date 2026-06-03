@@ -212,10 +212,15 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
         throw new Error('Cannot delegate an expired capability.')
       }
 
+      // `parentCapability` is a string only when it is a root zcap ID; root
+      // zcaps carry no `allowedAction`, `expires`, or delegation proof, so a
+      // string parent is treated as having none of those.
+      const parent =
+        typeof parentCapability === 'string' ? undefined : parentCapability
+
       // ensure `allowedAction`, if present, is not less restrictive
-      const parent = parentCapability as IZcap
       const parentAllowedAction =
-        'allowedAction' in parent ? parent.allowedAction : undefined
+        parent && 'allowedAction' in parent ? parent.allowedAction : undefined
       const allowedAction = (document as { allowedAction?: string | string[] })
         .allowedAction
       if (
@@ -228,7 +233,8 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
       }
 
       // ensure `expires` is not less restrictive
-      const parentExpires = 'expires' in parent ? parent.expires : undefined
+      const parentExpires =
+        parent && 'expires' in parent ? parent.expires : undefined
       if (parentExpires !== undefined) {
         // handle case where `expires` is set in the parent, but the child
         // has an expiration date greater than the parent;
@@ -251,7 +257,8 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
         // get delegated date-time (note: `computeCapabilityChain` has already
         // validated that there is a single delegation proof in
         // `parentCapability`)
-        const [parentProof] = utils.getDelegationProofs({ capability: parent })
+        // a chain length > 1 means the parent is a delegated (object) zcap
+        const [parentProof] = utils.getDelegationProofs({ capability: parent! })
         const parentDelegationTime = Date.parse(parentProof!.created)
         const childDelegationTime = Date.parse(proof.created!)
         // verify parent capability was not delegated after child

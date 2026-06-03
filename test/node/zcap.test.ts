@@ -213,6 +213,30 @@ describe('zcap', () => {
       })
       expect(delegatedCapability).toEqual(capabilities.delegated.beta)
     })
+
+    it('should succeed when "parentCapability" is a root zcap ID string',
+      async () => {
+        // pass `parentCapability` as the root zcap *ID string* (not the full
+        // object); the `capabilityChain` must still be auto-computed and the
+        // root-parent attenuation checks must not choke on the string value
+        const newCapability = {
+          '@context': ZCAP_CONTEXT_URL,
+          id: 'urn:uuid:710910c8-61e4-11ec-8739-10bf48838a41',
+          controller: bob.id(),
+          parentCapability: capabilities.root.beta.id,
+          invocationTarget: capabilities.root.beta.invocationTarget,
+          expires: EXPIRES_3000_DATE
+        }
+        const delegatedCapability = await _delegate({
+          newCapability,
+          delegator: alice,
+          date: CONSTANT_DATE,
+          purposeOptions: {
+            parentCapability: capabilities.root.beta.id
+          }
+        })
+        expect(delegatedCapability).toEqual(capabilities.delegated.beta)
+      })
   })
 
   context('Capability controller is itself a verification method', () => {
