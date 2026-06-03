@@ -1,5 +1,23 @@
 # @interop/zcap ChangeLog
 
+## Unreleased - TBD
+
+### Changed
+- Convert the source from JavaScript (with JSDoc) to **TypeScript** (`src/*.ts`).
+  The public runtime API is unchanged; full type declarations are emitted to
+  `dist/` alongside the compiled JS, reusing the shared zcap interfaces from
+  `@interop/data-integrity-core`.
+- **BREAKING**: Published output moved from `lib/`/`types/` to `dist/`, and the
+  minimum supported Node.js version is now **>= 24**.
+- Replace the test/build tooling with the Interop isomorphic-lib stack: ESLint
+  flat config + Prettier, Vitest (Node), and Playwright (browser), replacing
+  the previous ESLint (eslintrc) + Mocha/Chai + Karma setup.
+- Migrate the test suite to `test/` (`test/node/*.test.ts`,
+  `test/browser/*.spec.ts`). The test document loader is now built on
+  `@interop/security-document-loader`'s `securityLoader()`, and test suites/keys
+  use the `@interop/ed25519-signature` and `@interop/ed25519-verification-key`
+  forks. The former `did:v1` test actor is now a `did:key`.
+
 ## 10.1.0 - 2026-06-01
 
 ### Changed
