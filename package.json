@@ -35,18 +35,18 @@
   ],
   "dependencies": {
     "@digitalbazaar/zcap-context": "^2.0.1",
-    "@interop/data-integrity-core": "^6.1.0",
+    "@interop/data-integrity-core": "^6.1.1",
     "@interop/jsonld-signatures": "^11.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@interop/did-method-key": "^7.1.0",
     "@interop/ed25519-signature": "^7.0.1",
     "@interop/ed25519-verification-key": "^7.0.1",
     "@interop/security-document-loader": "^9.2.1",
     "@playwright/test": "^1.60.0",
     "@types/node": "^25.9.1",
     "@vitest/coverage-v8": "^4.1.7",
-    "chai": "^4.3.6",
     "eslint": "^10.4.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.6.0",
