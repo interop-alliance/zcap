@@ -1,6 +1,6 @@
 # @interop/zcap ChangeLog
 
-## Unreleased - TBD
+## 11.0.0 - 2026-06-02
 
 ### Changed
 - Convert the source from JavaScript (with JSDoc) to **TypeScript** (`src/*.ts`).
