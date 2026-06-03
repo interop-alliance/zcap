@@ -16,9 +16,6 @@ export const ZCAP_CONTEXT: object = CONTEXT
 /** The zcap JSON-LD context URL (`https://w3id.org/zcap/v1`). */
 export const ZCAP_CONTEXT_URL: string = CONTEXT_URL
 
-/** The base URL for the zcap security vocabulary. */
-export const CAPABILITY_VOCAB_URL = 'https://w3id.org/security#'
-
 /** URI prefix for root capability IDs (`urn:zcap:root:`). */
 export const ZCAP_ROOT_PREFIX = 'urn:zcap:root:'
 

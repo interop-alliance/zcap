@@ -8,15 +8,17 @@ import type {
   LinkedDataProof
 } from '@interop/jsonld-signatures'
 import type {
+  IDelegatedZcap,
+  IRootZcap,
+  IZcap
+} from '@interop/data-integrity-core/zcap'
+import type { IDocumentLoader } from '@interop/data-integrity-core/loader'
+import type {
   CapabilityDelegationOptions,
   CapabilityMeta,
   CapabilityProofPurposeOptions,
   CapabilityValidateResult,
-  IDelegatedZcap,
-  IDocumentLoader,
   InspectCapabilityChain,
-  IRootZcap,
-  IZcap,
   ValidateOptions
 } from './types.js'
 const { ControllerProofPurpose } = jsigs.purposes

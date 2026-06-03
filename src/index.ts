@@ -3,7 +3,7 @@
  */
 import jsigs from '@interop/jsonld-signatures'
 import * as constants from './constants.js'
-import type { IDocumentLoader } from './types.js'
+import type { IDocumentLoader } from '@interop/data-integrity-core/loader'
 
 /* Core API */
 export { CapabilityInvocation } from './CapabilityInvocation.js'
@@ -13,11 +13,6 @@ export { constants }
 
 /* Type exports */
 export type {
-  ICapabilityDelegationProof,
-  IDelegatedZcap,
-  IRootZcap,
-  IZcap,
-  IDocumentLoader,
   CapabilityChainDetails,
   CapabilityMeta,
   InspectCapabilityChain,
