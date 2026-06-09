@@ -1,6 +1,6 @@
 # @interop/zcap ChangeLog
 
-## 11.0.2 -
+## 11.0.2 - 2026-06-09
 
 ### Changed
 
