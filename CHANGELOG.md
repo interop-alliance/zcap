@@ -1,5 +1,11 @@
 # @interop/zcap ChangeLog
 
+## 11.0.3 - 2026-06-13
+
+### Changed
+
+- Update to `@interop/data-integrity-core@8.0.0` and related.
+
 ## 11.0.2 - 2026-06-09
 
 ### Changed

@@ -1,6 +1,6 @@
 {
   "name": "@interop/zcap",
-  "version": "11.0.2",
+  "version": "11.0.3",
   "description": "Authorization Capabilities reference implementation.",
   "homepage": "https://github.com/interop-alliance/zcap",
   "author": {
