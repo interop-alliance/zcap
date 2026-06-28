@@ -1,5 +1,11 @@
 # @interop/zcap ChangeLog
 
+## 11.0.4 - 2026-06-28
+
+### Changed
+
+- Update to `@interop/data-integrity-core@8.1.0`, jsigs, http-client and related.
+
 ## 11.0.3 - 2026-06-13
 
 ### Changed

@@ -1,6 +1,6 @@
 {
   "name": "@interop/zcap",
-  "version": "11.0.3",
+  "version": "11.0.4",
   "description": "Authorization Capabilities reference implementation.",
   "homepage": "https://github.com/interop-alliance/zcap",
   "author": {
@@ -36,15 +36,15 @@
   ],
   "dependencies": {
     "@digitalbazaar/zcap-context": "^2.0.1",
-    "@interop/data-integrity-core": "^8.0.0",
-    "@interop/jsonld-signatures": "^11.8.1"
+    "@interop/data-integrity-core": "^8.1.0",
+    "@interop/jsonld-signatures": "^11.8.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@interop/did-method-key": "^7.3.1",
-    "@interop/ed25519-signature": "^7.1.1",
-    "@interop/ed25519-verification-key": "^8.0.0",
-    "@interop/security-document-loader": "^9.3.0",
+    "@interop/did-method-key": "^7.3.3",
+    "@interop/ed25519-signature": "^7.1.2",
+    "@interop/ed25519-verification-key": "^8.0.2",
+    "@interop/security-document-loader": "^9.4.1",
     "@playwright/test": "^1.60.0",
     "@types/node": "^25.9.1",
     "@vitest/coverage-v8": "^4.1.7",
