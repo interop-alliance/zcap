@@ -224,15 +224,30 @@ export function isValidTarget({
 
     If the `baseInvocationTarget` already has a query (has `?`) then the
     suffix that follows it must start with `&`. Otherwise, it may start
-    with either `/` or `?`. */
+    with either `/` or `?`.
+
+    A base that already ends in its own separator (`/` for a path base,
+    `?` or `&` for a query base) is its own boundary prefix: appending
+    another separator would degenerate (`//`, `?&`, `&&`) and match no
+    descendant at all, while the base itself still enforces the same
+    boundary (`/space/abc/` never matches `/space/abc-evil`, and the
+    slashless parent `/space/abc` is still refused). */
     const prefixes = []
     if (baseInvocationTarget.includes('?')) {
       // query already present in base invocation target, so only accept new
       // variables in the query
-      prefixes.push(`${baseInvocationTarget}&`)
+      prefixes.push(
+        baseInvocationTarget.endsWith('?') || baseInvocationTarget.endsWith('&')
+          ? baseInvocationTarget
+          : `${baseInvocationTarget}&`
+      )
     } else {
       // accept path-based attenuation or new query-based attenuation
-      prefixes.push(`${baseInvocationTarget}/`)
+      prefixes.push(
+        baseInvocationTarget.endsWith('/')
+          ? baseInvocationTarget
+          : `${baseInvocationTarget}/`
+      )
       prefixes.push(`${baseInvocationTarget}?`)
     }
     if (prefixes.some(prefix => invocationTarget.startsWith(prefix))) {

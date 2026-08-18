@@ -263,6 +263,111 @@ describe('utils', () => {
       ).toBe(false)
     })
 
+    it('accepts descendants of a base ending in "/"', () => {
+      expect(
+        isValidTarget({
+          invocationTarget: 'https://example.com/a/b',
+          baseInvocationTarget: 'https://example.com/a/',
+          allowTargetAttenuation: true
+        })
+      ).toBe(true)
+      expect(
+        isValidTarget({
+          invocationTarget: 'https://example.com/a/b/c',
+          baseInvocationTarget: 'https://example.com/a/',
+          allowTargetAttenuation: true
+        })
+      ).toBe(true)
+    })
+
+    it('refuses the slashless parent of a base ending in "/"', () => {
+      expect(
+        isValidTarget({
+          invocationTarget: 'https://example.com/a',
+          baseInvocationTarget: 'https://example.com/a/',
+          allowTargetAttenuation: true
+        })
+      ).toBe(false)
+    })
+
+    it('keeps the segment boundary for a base ending in "/"', () => {
+      expect(
+        isValidTarget({
+          invocationTarget: 'https://example.com/a-evil',
+          baseInvocationTarget: 'https://example.com/a/',
+          allowTargetAttenuation: true
+        })
+      ).toBe(false)
+      expect(
+        isValidTarget({
+          invocationTarget: 'https://example.com/a-evil/b',
+          baseInvocationTarget: 'https://example.com/a/',
+          allowTargetAttenuation: true
+        })
+      ).toBe(false)
+    })
+
+    it('keeps the segment boundary for a slashless base', () => {
+      expect(
+        isValidTarget({
+          invocationTarget: 'https://example.com/a-evil',
+          baseInvocationTarget: 'https://example.com/a',
+          allowTargetAttenuation: true
+        })
+      ).toBe(false)
+      expect(
+        isValidTarget({
+          invocationTarget: 'https://example.com/a-evil/b',
+          baseInvocationTarget: 'https://example.com/a',
+          allowTargetAttenuation: true
+        })
+      ).toBe(false)
+    })
+
+    it('accepts query-based attenuation on a base ending in "/"', () => {
+      expect(
+        isValidTarget({
+          invocationTarget: 'https://example.com/a/?x=1',
+          baseInvocationTarget: 'https://example.com/a/',
+          allowTargetAttenuation: true
+        })
+      ).toBe(true)
+    })
+
+    it('accepts an exact match for a base ending in "/"', () => {
+      expect(
+        isValidTarget({
+          invocationTarget: 'https://example.com/a/',
+          baseInvocationTarget: 'https://example.com/a/'
+        })
+      ).toBe(true)
+    })
+
+    it('accepts new query variables on a base ending in "?" or "&"', () => {
+      expect(
+        isValidTarget({
+          invocationTarget: 'https://example.com/a?x=1',
+          baseInvocationTarget: 'https://example.com/a?',
+          allowTargetAttenuation: true
+        })
+      ).toBe(true)
+      expect(
+        isValidTarget({
+          invocationTarget: 'https://example.com/a?x=1&y=2',
+          baseInvocationTarget: 'https://example.com/a?x=1&',
+          allowTargetAttenuation: true
+        })
+      ).toBe(true)
+      // a "&"-terminated base still refuses a target on another path
+      expect(
+        isValidTarget({
+          invocationTarget: 'https://example.com/b?x=1&y=2',
+          baseInvocationTarget: 'https://example.com/a?x=1&',
+          allowTargetAttenuation: true
+        })
+      ).toBe(false)
+    })
+
     it('rejects an unrelated target even with attenuation enabled', () => {
       expect(
         isValidTarget({

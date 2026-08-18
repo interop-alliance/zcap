@@ -1,6 +1,21 @@
 # @interop/zcap ChangeLog
 
-## 11.0.5 - 2026-07-17
+## 11.1.0 - TBD
+
+### Fixed
+
+- `isValidTarget` now treats a base invocation target that already ends in
+  its own separator as its own attenuation prefix: a base ending in `/`
+  accepts its descendants (previously the appended `/` degenerated the
+  prefix to `//` and matched nothing), and a query base ending in `?` or
+  `&` accepts appended query variables. Boundary behavior is unchanged: a
+  trailing-slash base still refuses its slashless parent URL, and
+  `/space/abc` still never matches `/space/abc-evil`. This makes a
+  subtree target (a URL with a trailing slash, covering everything below
+  it while structurally excluding the parent URL itself) expressible.
+  The change fails closed across mixed versions: a verifier without this
+  fix refuses a trailing-slash target's descendants, so an unaware
+  deployment denies rather than over-grants.
 
 ### Changed
 
