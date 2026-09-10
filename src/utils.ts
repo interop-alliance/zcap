@@ -813,3 +813,17 @@ export function createDetailedError(
   error.details = details
   return error
 }
+
+/**
+ * Thrown when a capability's `expires` has passed. This covers the invoked
+ * capability, every capability in its delegation chain, and a parent that
+ * has already expired at delegation time. Callers should check `name`
+ * rather than use `instanceof`, since `name` survives realm and
+ * package-copy boundaries.
+ */
+export class CapabilityExpiredError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'CapabilityExpiredError'
+  }
+}

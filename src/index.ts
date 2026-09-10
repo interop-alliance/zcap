@@ -8,7 +8,7 @@ import type { IDocumentLoader } from '@interop/data-integrity-core/loader'
 /* Core API */
 export { CapabilityInvocation } from './CapabilityInvocation.js'
 export { CapabilityDelegation } from './CapabilityDelegation.js'
-export { createRootCapability } from './utils.js'
+export { CapabilityExpiredError, createRootCapability } from './utils.js'
 export { constants }
 
 /* Type exports */

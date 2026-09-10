@@ -613,7 +613,9 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
               maxClockSkew
             }) > 0
           ) {
-            throw new Error('A capability in the delegation chain has expired.')
+            throw new utils.CapabilityExpiredError(
+              'A capability in the delegation chain has expired.'
+            )
           }
         }
 

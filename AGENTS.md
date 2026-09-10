@@ -81,7 +81,8 @@ src/
   utils.ts                  Pure helpers: createRootCapability,
                             dereferenceCapabilityChain, checkCapability,
                             computeCapabilityChain, isValidTarget,
-                            getAllowedActions, getDelegationProofs, compareTime
+                            getAllowedActions, getDelegationProofs, compareTime;
+                            also the CapabilityExpiredError class
 ```
 
 ### Public API
@@ -91,6 +92,8 @@ import {
   CapabilityInvocation, // proof purpose — used when invoking a zcap
   CapabilityDelegation, // proof purpose — used when delegating a zcap
   createRootCapability, // ({controller, invocationTarget}) => zcap object
+  CapabilityExpiredError, // Error subclass (name 'CapabilityExpiredError')
+  // thrown by every expiry check; match on `name`, not `instanceof`
   constants, // { ZCAP_CONTEXT_URL, ZCAP_ROOT_PREFIX, ... }
   documentLoader, // default loader (zcap + jsigs contexts only)
   extendDocumentLoader // wrap an existing loader to also serve zcap context

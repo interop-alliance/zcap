@@ -2392,6 +2392,7 @@ describe('zcap', () => {
           expect(result.error.name).toBe('VerificationError')
           const [error] = result.error.errors
           expect(error.message).toBe('The invoked capability has expired.')
+          expect(error.name).toBe('CapabilityExpiredError')
         }
       )
 
@@ -2448,6 +2449,7 @@ describe('zcap', () => {
           expect(result.error.name).toBe('VerificationError')
           const [error] = result.error.errors
           expect(error.message).toBe('The invoked capability has expired.')
+          expect(error.name).toBe('CapabilityExpiredError')
         }
       )
 
@@ -2523,6 +2525,7 @@ describe('zcap', () => {
           expect(result.error.name).toBe('VerificationError')
           const [error] = result.error.errors
           expect(error.message).toBe('The invoked capability has expired.')
+          expect(error.name).toBe('CapabilityExpiredError')
         }
       )
 
@@ -2597,6 +2600,7 @@ describe('zcap', () => {
           expect(result.error.name).toBe('VerificationError')
           const [error] = result.error.errors
           expect(error.message).toBe('The invoked capability has expired.')
+          expect(error.name).toBe('CapabilityExpiredError')
         }
       )
 
@@ -2675,6 +2679,7 @@ describe('zcap', () => {
           expect(error.message).toBe(
             'A capability in the delegation chain has expired.'
           )
+          expect(error.name).toBe('CapabilityExpiredError')
         }
       )
 
@@ -2747,6 +2752,7 @@ describe('zcap', () => {
           expect(error.message).toBe(
             'A capability in the delegation chain has expired.'
           )
+          expect(error.name).toBe('CapabilityExpiredError')
         }
       )
 
@@ -2989,7 +2995,7 @@ describe('zcap', () => {
           localError = e
         }
         expect(localError).toBeDefined()
-        expect(localError.name).toBe('Error')
+        expect(localError.name).toBe('CapabilityExpiredError')
         expect(localError.message).toContain(
           'Cannot delegate an expired capability.'
         )
@@ -3111,6 +3117,7 @@ describe('zcap', () => {
           expect(error.message).toBe(
             'A capability in the delegation chain has expired.'
           )
+          expect(error.name).toBe('CapabilityExpiredError')
         }
       )
 
@@ -3184,6 +3191,7 @@ describe('zcap', () => {
           expect(result.error.name).toBe('VerificationError')
           const [error] = result.error.errors
           expect(error.message).toBe('The invoked capability has expired.')
+          expect(error.name).toBe('CapabilityExpiredError')
         }
       )
 
@@ -3255,6 +3263,7 @@ describe('zcap', () => {
           expect(result.error.errors).toHaveLength(1)
           const [error] = result.error.errors
           expect(error.message).toBe('The invoked capability has expired.')
+          expect(error.name).toBe('CapabilityExpiredError')
         }
       )
 
@@ -3475,6 +3484,7 @@ describe('zcap', () => {
           expect(result.error.name).toBe('VerificationError')
           const [error] = result.error.errors
           expect(error.message).toBe('The invoked capability has expired.')
+          expect(error.name).toBe('CapabilityExpiredError')
         }
       )
     }) // end Expiration date

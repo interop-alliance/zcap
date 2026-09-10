@@ -209,7 +209,9 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
       clock drift issue here. We are not comparing against any live values
       but against date-time values expressed in the chain. */
       if (created > expires) {
-        throw new Error('Cannot delegate an expired capability.')
+        throw new utils.CapabilityExpiredError(
+          'Cannot delegate an expired capability.'
+        )
       }
 
       // `parentCapability` is a string only when it is a root zcap ID; root

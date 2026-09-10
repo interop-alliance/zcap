@@ -469,7 +469,7 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
           maxClockSkew
         }) > 0
       ) {
-        throw new Error('The invoked capability has expired.')
+        throw new utils.CapabilityExpiredError('The invoked capability has expired.')
       }
     }
 

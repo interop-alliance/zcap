@@ -1,5 +1,15 @@
 # @interop/zcap ChangeLog
 
+## 11.2.0 - TBD
+
+### Added
+
+- `CapabilityExpiredError`, thrown by the three expiry checks ("The invoked
+  capability has expired.", "A capability in the delegation chain has
+  expired.", and "Cannot delegate an expired capability."). It carries
+  `name: 'CapabilityExpiredError'` so a caller can report expiry as its own
+  cause without matching message text. Messages are unchanged.
+
 ## 11.1.0 - 2026-08-18
 
 ### Fixed
