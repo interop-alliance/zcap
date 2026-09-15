@@ -1,6 +1,6 @@
 # @interop/zcap ChangeLog
 
-## 11.3.0 - TBD
+## 11.3.0 - 2026-09-14
 
 ### Added
 
