@@ -1,5 +1,12 @@
 # @interop/zcap ChangeLog
 
+## 11.3.0 - TBD
+
+### Added
+
+- Export `checkCapability`, so a caller can validate a capability's data
+  model (root or delegated) before storing it.
+
 ## 11.2.0 - 2026-09-09
 
 ### Added
