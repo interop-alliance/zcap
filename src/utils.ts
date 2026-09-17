@@ -663,8 +663,9 @@ export function hasValidAllowedAction({
  *
  * Checks include: required `@context`, absolute-URI `id` and
  * `invocationTarget`, `allowedAction` shape, and (for delegated zcaps) a valid
- * `parentCapability`, a `capabilityDelegation` proof with a valid `created`
- * date, and a valid `expires` date. Root zcaps must not carry `expires`.
+ * `parentCapability`, a `capabilityDelegation` proof with a non-empty
+ * `capabilityChain` and a valid `created` date, and a valid `expires` date.
+ * Root zcaps must not carry `expires`.
  *
  * @param options - The options.
  * @param options.capability - The capability to check.
@@ -718,6 +719,17 @@ export function checkCapability({
     const [proof] = getDelegationProofs({ capability })
     if (!proof) {
       throw new Error('Delegated capability must have a "proof".')
+    }
+    /* Note: The first entry in a delegated capability's chain is the ID of the
+    root capability, which anchors the chain to a root zcap that the verifier
+    dereferences via a trusted mechanism. An empty chain cannot be anchored to
+    any root and is rejected here; only a root capability has an empty chain. */
+    const { capabilityChain } = proof
+    if (!(Array.isArray(capabilityChain) && capabilityChain.length >= 1)) {
+      throw new Error(
+        'Delegated capability must have a "capabilityChain" in its ' +
+          'delegation proof with at least one entry.'
+      )
     }
     if (isNaN(Date.parse(proof.created))) {
       throw new Error(

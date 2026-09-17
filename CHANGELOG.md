@@ -1,5 +1,13 @@
 # @interop/zcap ChangeLog
 
+## 11.3.1 - TBD
+
+### Fixed
+
+- `checkCapability` now rejects a delegated capability whose delegation proof
+  has a missing or empty `capabilityChain`. The first chain entry is the root
+  capability ID that anchors the chain, so an empty chain anchors to nothing.
+
 ## 11.3.0 - 2026-09-14
 
 ### Added

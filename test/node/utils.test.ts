@@ -568,6 +568,47 @@ describe('utils', () => {
       )
     })
 
+    it('rejects a delegated capability whose proof has an empty capabilityChain', () => {
+      const capability = makeDelegated({
+        proof: {
+          proofPurpose: 'capabilityDelegation',
+          created: '2024-01-01T00:00:00Z',
+          capabilityChain: []
+        }
+      })
+      expect(() => checkCapability({ capability, expectRoot: false })).toThrow(
+        'Delegated capability must have a "capabilityChain" in its ' +
+          'delegation proof with at least one entry.'
+      )
+    })
+
+    it('rejects a delegated capability whose proof has no capabilityChain', () => {
+      const capability = makeDelegated({
+        proof: {
+          proofPurpose: 'capabilityDelegation',
+          created: '2024-01-01T00:00:00Z'
+        }
+      })
+      expect(() => checkCapability({ capability, expectRoot: false })).toThrow(
+        'Delegated capability must have a "capabilityChain" in its ' +
+          'delegation proof with at least one entry.'
+      )
+    })
+
+    it('rejects a delegated capability whose capabilityChain is not an array', () => {
+      const capability = makeDelegated({
+        proof: {
+          proofPurpose: 'capabilityDelegation',
+          created: '2024-01-01T00:00:00Z',
+          capabilityChain: 'urn:zcap:root:x'
+        }
+      })
+      expect(() => checkCapability({ capability, expectRoot: false })).toThrow(
+        'Delegated capability must have a "capabilityChain" in its ' +
+          'delegation proof with at least one entry.'
+      )
+    })
+
     it('rejects a delegated capability with an invalid proof created date', () => {
       const capability = makeDelegated({
         proof: {
