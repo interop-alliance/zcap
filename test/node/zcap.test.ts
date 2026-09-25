@@ -934,6 +934,227 @@ describe('zcap', () => {
       }
     )
 
+    it(
+      'should verify a capability chain of depth 2 w/an allowedAction ' +
+        'array that matches the root allowedAction string',
+      async () => {
+        // alice delegates to bob w/the same action the root allows, but
+        // expressed as an array instead of as a string
+        const delegatedCapability = await _delegate({
+          newCapability: {
+            '@context': ZCAP_CONTEXT_URL,
+            id: uuid(),
+            controller: bob.id(),
+            parentCapability: capabilities.root.gamma.id,
+            invocationTarget: capabilities.root.gamma.invocationTarget,
+            expires: EXPIRES_3000_DATE,
+            allowedAction: ['write']
+          },
+          parentCapability: capabilities.root.gamma,
+          delegator: alice
+        })
+
+        // bob invokes
+        const doc = clone(mock.exampleDoc)
+        const invocation = await _invoke({
+          doc,
+          invoker: bob,
+          capability: delegatedCapability,
+          capabilityAction: 'write'
+        })
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.gamma,
+          expectedAction: 'write'
+        })
+        expect(result).toBeDefined()
+        expect(result.verified).toBe(true)
+      }
+    )
+
+    it(
+      'should fail to verify a capability chain of depth 2 when an ' +
+        '"allowedAction" is not allowed by the root',
+      async () => {
+        // alice delegates to bob...
+        // first check to ensure that delegation fails "client side"
+        let delegatedCapability
+        let localError
+        try {
+          // alice attempts to allow an action the root does not
+          delegatedCapability = await _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: bob.id(),
+              parentCapability: capabilities.root.gamma.id,
+              invocationTarget: capabilities.root.gamma.invocationTarget,
+              expires: EXPIRES_3000_DATE,
+              allowedAction: ['read', 'write']
+            },
+            parentCapability: capabilities.root.gamma,
+            delegator: alice
+          })
+        } catch (e) {
+          localError = e
+        }
+        expect(localError).toBeDefined()
+        expect(localError.name).toBe('Error')
+        expect(localError.message).toBe(
+          'The "allowedAction" in a delegated capability ' +
+            'must not be less restrictive than its parent.'
+        )
+
+        // alice delegates to bob w/an allowed action rule the root forbids
+        delegatedCapability = await _delegate({
+          newCapability: {
+            '@context': ZCAP_CONTEXT_URL,
+            id: uuid(),
+            controller: bob.id(),
+            parentCapability: capabilities.root.gamma.id,
+            invocationTarget: capabilities.root.gamma.invocationTarget,
+            expires: EXPIRES_3000_DATE,
+            allowedAction: ['read', 'write']
+          },
+          purposeOptions: {
+            // skip local validation to allow the zcap to be delegated so it
+            // can be checked by the verifier
+            _skipLocalValidationForTesting: true
+          },
+          parentCapability: capabilities.root.gamma,
+          delegator: alice
+        })
+
+        const result = await _verifyDelegation({
+          delegation: delegatedCapability,
+          expectedRootCapability: capabilities.root.gamma.id
+        })
+        expect(result).toBeDefined()
+        expect(result.verified).toBe(false)
+        expect(result.error.name).toBe('VerificationError')
+        const [error] = result.error.errors
+        expect(error.message).toContain(
+          'delegated capability must not be less restrictive'
+        )
+      }
+    )
+
+    it(
+      'should fail to verify a capability chain of depth 2 when a ' +
+        '"capabilityAction" is not allowed by the root',
+      async () => {
+        // alice delegates to bob w/an allowed action rule the root forbids
+        const delegatedCapability = await _delegate({
+          newCapability: {
+            '@context': ZCAP_CONTEXT_URL,
+            id: uuid(),
+            controller: bob.id(),
+            parentCapability: capabilities.root.gamma.id,
+            invocationTarget: capabilities.root.gamma.invocationTarget,
+            expires: EXPIRES_3000_DATE,
+            allowedAction: ['read', 'write']
+          },
+          purposeOptions: {
+            // skip local validation to allow the zcap to be delegated so it
+            // can be checked by the verifier
+            _skipLocalValidationForTesting: true
+          },
+          parentCapability: capabilities.root.gamma,
+          delegator: alice
+        })
+
+        // bob invokes using 'read', an action only his own zcap allows
+        const doc = clone(mock.exampleDoc)
+        const invocation = await _invoke({
+          doc,
+          invoker: bob,
+          capability: delegatedCapability,
+          capabilityAction: 'read'
+        })
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.gamma,
+          expectedAction: 'read'
+        })
+        expect(result).toBeDefined()
+        expect(result.verified).toBe(false)
+        expect(result.error.name).toBe('VerificationError')
+        const [error] = result.error.errors
+        expect(error.message).toContain(
+          'delegated capability must not be less restrictive'
+        )
+      }
+    )
+
+    it(
+      'should fail to verify a capability chain of depth 2 when an ' +
+        '"allowedAction" is an empty array',
+      async () => {
+        // alice delegates to bob...
+        // first check to ensure that delegation fails "client side"
+        let delegatedCapability
+        let localError
+        try {
+          // alice attempts to express an empty set of allowed actions
+          delegatedCapability = await _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: bob.id(),
+              parentCapability: capabilities.root.gamma.id,
+              invocationTarget: capabilities.root.gamma.invocationTarget,
+              expires: EXPIRES_3000_DATE,
+              allowedAction: []
+            },
+            parentCapability: capabilities.root.gamma,
+            delegator: alice
+          })
+        } catch (e) {
+          localError = e
+        }
+        expect(delegatedCapability).toBeUndefined()
+        expect(localError).toBeDefined()
+        expect(localError.name).toBe('Error')
+        expect(localError.message).toBe(
+          'If present on a capability, "allowedAction" must be a string or ' +
+            'a non-empty array.'
+        )
+
+        // alice delegates to bob w/an empty `allowedAction` array
+        delegatedCapability = await _delegate({
+          newCapability: {
+            '@context': ZCAP_CONTEXT_URL,
+            id: uuid(),
+            controller: bob.id(),
+            parentCapability: capabilities.root.gamma.id,
+            invocationTarget: capabilities.root.gamma.invocationTarget,
+            expires: EXPIRES_3000_DATE,
+            allowedAction: []
+          },
+          purposeOptions: {
+            // skip local validation to allow the zcap to be delegated so it
+            // can be checked by the verifier
+            _skipLocalValidationForTesting: true
+          },
+          parentCapability: capabilities.root.gamma,
+          delegator: alice
+        })
+
+        const result = await _verifyDelegation({
+          delegation: delegatedCapability,
+          expectedRootCapability: capabilities.root.gamma.id
+        })
+        expect(result).toBeDefined()
+        expect(result.verified).toBe(false)
+        expect(result.error.name).toBe('VerificationError')
+        const [error] = result.error.errors
+        expect(error.message).toBe(
+          'If present on a capability, "allowedAction" must be a string or ' +
+            'a non-empty array.'
+        )
+      }
+    )
+
     describe('Chain depth of 3', () => {
       it('should verify chain', async () => {
         // alice delegates to bob
@@ -1464,6 +1685,332 @@ describe('zcap', () => {
           })
           expect(result).toBeDefined()
           expect(result.verified).toBe(true)
+        }
+      )
+
+      it(
+        'should verify chain when child allowedAction array matches ' +
+          'the parent allowedAction string',
+        async () => {
+          // alice delegates to bob w/an allowed action restriction string
+          const bobZcap = await _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: bob.id(),
+              parentCapability: capabilities.root.beta.id,
+              invocationTarget: capabilities.root.beta.invocationTarget,
+              expires: EXPIRES_3000_DATE,
+              allowedAction: 'read'
+            },
+            parentCapability: capabilities.root.beta,
+            delegator: alice
+          })
+
+          // bob delegates to carol w/o narrowing the allowed actions, but
+          // expresses them as an array instead of as a string
+          const carolZcap = await _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: carol.id(),
+              parentCapability: bobZcap.id,
+              invocationTarget: bobZcap.invocationTarget,
+              expires: EXPIRES_3000_DATE,
+              allowedAction: ['read']
+            },
+            parentCapability: bobZcap,
+            delegator: bob
+          })
+
+          const result = await _verifyDelegation({
+            delegation: carolZcap,
+            expectedRootCapability: capabilities.root.beta.id
+          })
+          expect(result).toBeDefined()
+          expect(result.verified).toBe(true)
+        }
+      )
+
+      it(
+        'should verify chain when child allowedAction string is ' +
+          'in the parent allowedAction array',
+        async () => {
+          // alice delegates to bob w/an allowed action restriction array
+          const bobZcap = await _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: bob.id(),
+              parentCapability: capabilities.root.beta.id,
+              invocationTarget: capabilities.root.beta.invocationTarget,
+              expires: EXPIRES_3000_DATE,
+              allowedAction: ['read', 'write']
+            },
+            parentCapability: capabilities.root.beta,
+            delegator: alice
+          })
+
+          // bob delegates to carol and further restricts which actions she
+          // is allowed to take, expressed as a string
+          const carolZcap = await _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: carol.id(),
+              parentCapability: bobZcap.id,
+              invocationTarget: bobZcap.invocationTarget,
+              expires: EXPIRES_3000_DATE,
+              allowedAction: 'read'
+            },
+            parentCapability: bobZcap,
+            delegator: bob
+          })
+
+          const result = await _verifyDelegation({
+            delegation: carolZcap,
+            expectedRootCapability: capabilities.root.beta.id
+          })
+          expect(result).toBeDefined()
+          expect(result.verified).toBe(true)
+        }
+      )
+
+      it(
+        'should fail to verify chain when the child has no allowedAction ' +
+          'but the parent does',
+        async () => {
+          // alice delegates to bob w/an allowed action restriction
+          const bobZcap = await _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: bob.id(),
+              parentCapability: capabilities.root.beta.id,
+              invocationTarget: capabilities.root.beta.invocationTarget,
+              expires: EXPIRES_3000_DATE,
+              allowedAction: 'read'
+            },
+            parentCapability: capabilities.root.beta,
+            delegator: alice
+          })
+
+          // bob delegates to carol...
+          // first check to ensure that delegation fails "client side"
+          let carolZcap
+          let localError
+          try {
+            // bob attempts to delegate to carol w/o any action restriction
+            carolZcap = await _delegate({
+              parentCapability: bobZcap,
+              controller: carol,
+              delegator: bob
+            })
+          } catch (e) {
+            localError = e
+          }
+          expect(localError).toBeDefined()
+          expect(localError.name).toBe('Error')
+          expect(localError.message).toBe(
+            'The "allowedAction" in a delegated capability ' +
+              'must not be less restrictive than its parent.'
+          )
+
+          // bob delegates to carol w/o the action restriction he must keep
+          // (only possible by skipping local validation)
+          carolZcap = await _delegate({
+            parentCapability: bobZcap,
+            controller: carol,
+            delegator: bob,
+            purposeOptions: {
+              // skip local validation to allow the zcap to be delegated so
+              // it can be checked by the verifier
+              _skipLocalValidationForTesting: true
+            }
+          })
+
+          const result = await _verifyDelegation({
+            delegation: carolZcap,
+            expectedRootCapability: capabilities.root.beta.id
+          })
+          expect(result).toBeDefined()
+          expect(result.verified).toBe(false)
+          expect(result.error).toBeDefined()
+          expect(result.error.name).toBe('VerificationError')
+          const [error] = result.error.errors
+          expect(error.message).toContain(
+            'delegated capability must not be less restrictive'
+          )
+        }
+      )
+
+      it(
+        'should fail to verify chain when the child allowedAction is an ' +
+          'empty array but the parent allowedAction is a string',
+        async () => {
+          // alice delegates to bob w/an allowed action restriction string
+          const bobZcap = await _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: bob.id(),
+              parentCapability: capabilities.root.beta.id,
+              invocationTarget: capabilities.root.beta.invocationTarget,
+              expires: EXPIRES_3000_DATE,
+              allowedAction: 'read'
+            },
+            parentCapability: capabilities.root.beta,
+            delegator: alice
+          })
+
+          // bob delegates to carol...
+          // first check to ensure that delegation fails "client side"
+          let carolZcap
+          let localError
+          try {
+            // bob attempts to express an empty set of allowed actions
+            carolZcap = await _delegate({
+              newCapability: {
+                '@context': ZCAP_CONTEXT_URL,
+                id: uuid(),
+                controller: carol.id(),
+                parentCapability: bobZcap.id,
+                invocationTarget: bobZcap.invocationTarget,
+                expires: EXPIRES_3000_DATE,
+                allowedAction: []
+              },
+              parentCapability: bobZcap,
+              delegator: bob
+            })
+          } catch (e) {
+            localError = e
+          }
+          expect(carolZcap).toBeUndefined()
+          expect(localError).toBeDefined()
+          expect(localError.name).toBe('Error')
+          expect(localError.message).toBe(
+            'If present on a capability, "allowedAction" must be a string ' +
+              'or a non-empty array.'
+          )
+
+          // bob delegates to carol w/an empty `allowedAction` array
+          carolZcap = await _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: carol.id(),
+              parentCapability: bobZcap.id,
+              invocationTarget: bobZcap.invocationTarget,
+              expires: EXPIRES_3000_DATE,
+              allowedAction: []
+            },
+            purposeOptions: {
+              // skip local validation to allow the zcap to be delegated so
+              // it can be checked by the verifier
+              _skipLocalValidationForTesting: true
+            },
+            parentCapability: bobZcap,
+            delegator: bob
+          })
+
+          const result = await _verifyDelegation({
+            delegation: carolZcap,
+            expectedRootCapability: capabilities.root.beta.id
+          })
+          expect(result).toBeDefined()
+          expect(result.verified).toBe(false)
+          expect(result.error).toBeDefined()
+          expect(result.error.name).toBe('VerificationError')
+          const [error] = result.error.errors
+          expect(error.message).toBe(
+            'If present on a capability, "allowedAction" must be a string ' +
+              'or a non-empty array.'
+          )
+        }
+      )
+
+      it(
+        'should fail to verify chain when the child allowedAction is an ' +
+          'empty array but the parent allowedAction is a non-empty array',
+        async () => {
+          // alice delegates to bob w/an allowed action restriction array
+          const bobZcap = await _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: bob.id(),
+              parentCapability: capabilities.root.beta.id,
+              invocationTarget: capabilities.root.beta.invocationTarget,
+              expires: EXPIRES_3000_DATE,
+              allowedAction: ['read', 'write']
+            },
+            parentCapability: capabilities.root.beta,
+            delegator: alice
+          })
+
+          // bob delegates to carol...
+          // first check to ensure that delegation fails "client side"
+          let carolZcap
+          let localError
+          try {
+            // bob attempts to express an empty set of allowed actions
+            carolZcap = await _delegate({
+              newCapability: {
+                '@context': ZCAP_CONTEXT_URL,
+                id: uuid(),
+                controller: carol.id(),
+                parentCapability: bobZcap.id,
+                invocationTarget: bobZcap.invocationTarget,
+                expires: EXPIRES_3000_DATE,
+                allowedAction: []
+              },
+              parentCapability: bobZcap,
+              delegator: bob
+            })
+          } catch (e) {
+            localError = e
+          }
+          expect(carolZcap).toBeUndefined()
+          expect(localError).toBeDefined()
+          expect(localError.name).toBe('Error')
+          expect(localError.message).toBe(
+            'If present on a capability, "allowedAction" must be a string ' +
+              'or a non-empty array.'
+          )
+
+          // bob delegates to carol w/an empty `allowedAction` array
+          carolZcap = await _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: carol.id(),
+              parentCapability: bobZcap.id,
+              invocationTarget: bobZcap.invocationTarget,
+              expires: EXPIRES_3000_DATE,
+              allowedAction: []
+            },
+            purposeOptions: {
+              // skip local validation to allow the zcap to be delegated so
+              // it can be checked by the verifier
+              _skipLocalValidationForTesting: true
+            },
+            parentCapability: bobZcap,
+            delegator: bob
+          })
+
+          const result = await _verifyDelegation({
+            delegation: carolZcap,
+            expectedRootCapability: capabilities.root.beta.id
+          })
+          expect(result).toBeDefined()
+          expect(result.verified).toBe(false)
+          expect(result.error).toBeDefined()
+          expect(result.error.name).toBe('VerificationError')
+          const [error] = result.error.errors
+          expect(error.message).toBe(
+            'If present on a capability, "allowedAction" must be a string ' +
+              'or a non-empty array.'
+          )
         }
       )
 

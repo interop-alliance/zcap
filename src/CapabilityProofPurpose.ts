@@ -483,7 +483,7 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
 
     Verification process is:
 
-    1. If the chain only as the root capability, exit early.
+    1. If the chain only has the root capability, exit early.
     2. For each capability `zcap` in the chain, verify the capability delegation
       proof on `zcap` (if `capabilityChainMeta` has no precomputed result) and
       that all of the delegation rules have been followed. */
@@ -497,10 +497,12 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
       // 2. For each capability `zcap` in the chain, verify the capability
       //   delegation proof on `zcap` and that the delegation rules have been
       //   followed.
-      let parentAllowedAction: string | string[] | undefined
+      const [root] = dereferencedChain
+      // a root zcap may carry `allowedAction`; when it does, the first
+      // delegated link is checked against it like any other parent
+      let parentAllowedAction = root!.allowedAction
       let parentDelegationTime: number | undefined
       let parentExpirationTime: number | undefined
-      const [root] = dereferencedChain
       let parentInvocationTarget = root!.invocationTarget
 
       // track whether `capabilityChainMeta` needs its first result shifted to
@@ -551,8 +553,7 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
         }
 
         // ensure `allowedAction` is valid (compared against parent)
-        const allowedAction =
-          'allowedAction' in zcap ? zcap.allowedAction : undefined
+        const { allowedAction } = zcap
         if (
           !utils.hasValidAllowedAction({ allowedAction, parentAllowedAction })
         ) {

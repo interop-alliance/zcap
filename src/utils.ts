@@ -100,7 +100,7 @@ export function getAllowedActions({
 }: {
   capability: IZcap
 }): string[] {
-  if (!('allowedAction' in capability) || !capability.allowedAction) {
+  if (!capability.allowedAction) {
     return []
   }
   return [capability.allowedAction].flat()
@@ -621,7 +621,9 @@ export function checkProofContext({
 /**
  * Determines whether a child capability's `allowedAction` is valid, i.e., no
  * less restrictive than its parent's. If the parent does not restrict actions
- * (its `allowedAction` is absent), any child action is allowed.
+ * (its `allowedAction` is absent), any child action is allowed. If the parent
+ * restricts actions, the child must too, and every child action must be one
+ * of the parent's.
  *
  * @param options - The options.
  * @param options.allowedAction - The child capability's allowed action(s).
@@ -643,18 +645,19 @@ export function hasValidAllowedAction({
     return true
   }
 
-  if (Array.isArray(parentAllowedAction)) {
-    // parent's `allowedAction` must include every one from child's
-    if (Array.isArray(allowedAction)) {
-      return allowedAction.every(a => parentAllowedAction.includes(a))
-    }
-    return (
-      allowedAction !== undefined && parentAllowedAction.includes(allowedAction)
-    )
+  // the parent restricts the allowed actions, so the child must as well
+  if (!allowedAction) {
+    return false
   }
 
-  // require exact match
-  return parentAllowedAction === allowedAction
+  /* `allowedAction` can be expressed as either a string or a non-empty
+  array (see `checkCapability`), so compare the action sets, not the JSON
+  types used to express them. */
+  const parentActions = [parentAllowedAction].flat()
+  const actions = [allowedAction].flat()
+
+  // parent's `allowedAction` must include every one from child's
+  return actions.every(a => parentActions.includes(a))
 }
 
 /**

@@ -214,15 +214,15 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
         )
       }
 
-      // `parentCapability` is a string only when it is a root zcap ID; root
-      // zcaps carry no `allowedAction`, `expires`, or delegation proof, so a
-      // string parent is treated as having none of those.
+      // `parentCapability` is a string only when it is a root zcap ID. The
+      // root itself is not available here, so a string parent is treated as
+      // having no `allowedAction`, `expires`, or delegation proof; the
+      // verifier enforces the root's restrictions when checking the chain.
       const parent =
         typeof parentCapability === 'string' ? undefined : parentCapability
 
       // ensure `allowedAction`, if present, is not less restrictive
-      const parentAllowedAction =
-        parent && 'allowedAction' in parent ? parent.allowedAction : undefined
+      const parentAllowedAction = parent?.allowedAction
       const allowedAction = (document as { allowedAction?: string | string[] })
         .allowedAction
       if (

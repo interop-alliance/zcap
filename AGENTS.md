@@ -53,7 +53,10 @@ circuiting verification with a fraudulent tail.
 
 Key invariants enforced at each link:
 
-- `allowedAction` may only be made more restrictive, never relaxed.
+- `allowedAction` may only be made more restrictive, never relaxed. A root
+  zcap may carry `allowedAction` too; the first delegated link is checked
+  against it. `allowedAction` is compared as a set of action strings,
+  whether expressed as a string or an array.
 - `invocationTarget` must match the parent's exactly (unless
   `allowTargetAttenuation=true`, where URL path/query narrowing is allowed).
 - `expires` may only be made earlier, never later.

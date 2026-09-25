@@ -1,5 +1,17 @@
 # @interop/zcap ChangeLog
 
+## 11.3.2 - TBD
+
+### Fixed
+
+- Compare `allowedAction` sets, not JSON types, when checking that a delegated
+  capability is no less restrictive than its parent. A child `['write']` under
+  a parent `'write'` is now accepted.
+- Enforce the root capability's `allowedAction` against the first delegated
+  link during chain verification. Previously only delegation-time validation
+  checked it, so a verifier accepted a delegated zcap that widened the root's
+  actions.
+
 ## 11.3.1 - 2026-09-16
 
 ### Fixed
