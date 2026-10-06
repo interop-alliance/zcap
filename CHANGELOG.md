@@ -1,5 +1,11 @@
 # @interop/zcap ChangeLog
 
+## 11.3.3 - TBD
+
+### Changed
+
+- Update to latest `@interop/jsonld-signatures@11.8.7`.
+
 ## 11.3.2 - 2026-09-25
 
 ### Fixed
