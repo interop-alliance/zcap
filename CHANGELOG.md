@@ -1,5 +1,11 @@
 # @interop/zcap ChangeLog
 
+## 11.3.4 - TBD
+
+### Changed
+
+- Update to latest di core and jsigs.
+
 ## 11.3.3 - 2026-10-06
 
 ### Changed
