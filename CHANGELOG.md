@@ -1,5 +1,11 @@
 # @interop/zcap ChangeLog
 
+## 11.3.5 - TBD
+
+### Changed
+
+- Update to latest did-method-key dev dep.
+
 ## 11.3.4 - 2026-10-12
 
 ### Changed
