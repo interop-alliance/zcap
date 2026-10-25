@@ -103,12 +103,10 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
       inspectCapabilityChain ||
       suite
     if (hasVerifyProofParams) {
-      if (
-        !(
-          typeof expectedRootCapability === 'string' ||
-          Array.isArray(expectedRootCapability)
-        )
-      ) {
+      if (!(
+        typeof expectedRootCapability === 'string' ||
+        Array.isArray(expectedRootCapability)
+      )) {
         throw new TypeError(
           '"expectedRootCapability" must be a string or array.'
         )
@@ -119,7 +117,7 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
         ? expectedRootCapability
         : [expectedRootCapability]
       for (const erc of expectedRootCapabilities) {
-        if (!(typeof erc === 'string' && erc.includes(':'))) {
+        if (!utils.isAbsoluteUri(erc)) {
           throw new Error(
             '"expectedRootCapability" values must be absolute URI strings.'
           )

@@ -53,10 +53,10 @@ circuiting verification with a fraudulent tail.
 
 Key invariants enforced at each link:
 
-- `allowedAction` may only be made more restrictive, never relaxed. A root
-  zcap may carry `allowedAction` too; the first delegated link is checked
-  against it. `allowedAction` is compared as a set of action strings,
-  whether expressed as a string or an array.
+- `allowedAction` may only be made more restrictive, never relaxed. A root zcap
+  may carry `allowedAction` too; the first delegated link is checked against it.
+  `allowedAction` is compared as a set of action strings, whether expressed as a
+  string or an array.
 - `invocationTarget` must match the parent's exactly (unless
   `allowTargetAttenuation=true`, where URL path/query narrowing is allowed).
 - `expires` may only be made earlier, never later.
@@ -83,7 +83,7 @@ src/
                             new zcap against its parent before signing
   utils.ts                  Pure helpers: createRootCapability,
                             dereferenceCapabilityChain, checkCapability,
-                            computeCapabilityChain, isValidTarget,
+                            computeCapabilityChain, isValidTarget, isAbsoluteUri,
                             getAllowedActions, getDelegationProofs, compareTime;
                             also the CapabilityExpiredError class
 ```
@@ -95,6 +95,8 @@ import {
   CapabilityInvocation, // proof purpose — used when invoking a zcap
   CapabilityDelegation, // proof purpose — used when delegating a zcap
   createRootCapability, // ({controller, invocationTarget}) => zcap object
+  checkCapability, // structural check of a root or delegated zcap (throws)
+  isValidTarget, // invocation-target prefix check (allowTargetAttenuation)
   CapabilityExpiredError, // Error subclass (name 'CapabilityExpiredError')
   // thrown by every expiry check; match on `name`, not `instanceof`
   constants, // { ZCAP_CONTEXT_URL, ZCAP_ROOT_PREFIX, ... }

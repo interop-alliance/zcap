@@ -4,7 +4,7 @@
 [![NPM Version](https://img.shields.io/npm/v/@interop/zcap.svg)](https://npm.im/@interop/zcap)
 
 > JavaScript reference implementation for
-[Authorization Capabilities](https://w3c-ccg.github.io/zcap-spec/).
+> [Authorization Capabilities](https://w3c-ccg.github.io/zcap-spec/).
 
 ## Table of Contents
 
@@ -75,8 +75,8 @@ If editing the Readme, please conform to the
 
 ## Commercial Support
 
-Commercial support for this library is available upon request from
-Digital Bazaar: support@interop.com
+Commercial support for this library is available upon request from Interop
+Alliance: support@interop.com
 
 ## License
 

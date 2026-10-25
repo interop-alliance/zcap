@@ -19,10 +19,7 @@ import {
   compareTime,
   createDetailedError
 } from '../../src/utils.js'
-import {
-  ZCAP_CONTEXT_URL,
-  ZCAP_ROOT_PREFIX
-} from '../../src/constants.js'
+import { ZCAP_CONTEXT_URL, ZCAP_ROOT_PREFIX } from '../../src/constants.js'
 import * as zcap from '../../src/index.js'
 
 // minimal fixture builders ---------------------------------------------------
@@ -102,7 +99,10 @@ describe('utils', () => {
     const capability = makeRoot({ controller: 'did:example:alice' })
 
     it('matches when the verification method controller matches', () => {
-      const vm = { id: 'did:example:alice#key-1', controller: 'did:example:alice' }
+      const vm = {
+        id: 'did:example:alice#key-1',
+        controller: 'did:example:alice'
+      }
       expect(isController({ capability, verificationMethod: vm })).toBe(true)
     })
 
@@ -207,6 +207,10 @@ describe('utils', () => {
   })
 
   describe('isValidTarget', () => {
+    it('is exported from the package root', () => {
+      expect(zcap.isValidTarget).toBe(isValidTarget)
+    })
+
     it('accepts an exact match', () => {
       expect(
         isValidTarget({
@@ -413,9 +417,9 @@ describe('utils', () => {
           capabilityChain: [{ id: 'urn:a' }, { id: 'urn:b' }]
         }
       })
-      expect(() => computeCapabilityChain({ parentCapability: parent })).toThrow(
-        TypeError
-      )
+      expect(() =>
+        computeCapabilityChain({ parentCapability: parent })
+      ).toThrow(TypeError)
     })
 
     it('throws on relative URLs in the chain', () => {
@@ -426,9 +430,9 @@ describe('utils', () => {
           capabilityChain: ['relative-no-colon']
         }
       })
-      expect(() => computeCapabilityChain({ parentCapability: parent })).toThrow(
-        'relative URL'
-      )
+      expect(() =>
+        computeCapabilityChain({ parentCapability: parent })
+      ).toThrow('relative URL')
     })
   })
 
@@ -457,7 +461,10 @@ describe('utils', () => {
   describe('hasValidAllowedAction', () => {
     it('allows anything when the parent does not restrict actions', () => {
       expect(
-        hasValidAllowedAction({ allowedAction: 'read', parentAllowedAction: undefined })
+        hasValidAllowedAction({
+          allowedAction: 'read',
+          parentAllowedAction: undefined
+        })
       ).toBe(true)
     })
 

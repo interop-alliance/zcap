@@ -11,7 +11,8 @@ export { CapabilityDelegation } from './CapabilityDelegation.js'
 export {
   CapabilityExpiredError,
   checkCapability,
-  createRootCapability
+  createRootCapability,
+  isValidTarget
 } from './utils.js'
 export { constants }
 

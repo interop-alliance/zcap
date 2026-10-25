@@ -114,6 +114,18 @@ export function getAllowedActions({
  *
  * @returns Capability target.
  */
+/**
+ * Determines whether a value is a string that expresses an absolute URI
+ * (i.e., it contains a `:`).
+ *
+ * @param value - The value to check.
+ *
+ * @returns `true` if the value is an absolute URI string, `false` if not.
+ */
+export function isAbsoluteUri(value: unknown): value is string {
+  return typeof value === 'string' && value.includes(':')
+}
+
 export function getTarget({ capability }: { capability: IZcap }): string {
   // zcaps MUST have an `invocationTarget` that is a string
   return capability.invocationTarget
@@ -315,12 +327,10 @@ export function computeCapabilityChain({
     const lastIndex = capabilityChain.length - 1
     for (const [i, entry] of capabilityChain.entries()) {
       const entryType = typeof entry
-      if (
-        !(
-          (i === lastIndex && entryType === lastRequiredType) ||
-          (i !== lastIndex && entryType === 'string')
-        )
-      ) {
+      if (!(
+        (i === lastIndex && entryType === lastRequiredType) ||
+        (i !== lastIndex && entryType === 'string')
+      )) {
         throw new TypeError(
           'Cannot compute capability chain; parent capability chain is ' +
             'invalid; it must consist of strings of capability IDs except ' +
@@ -346,10 +356,7 @@ export function computeCapabilityChain({
 
   // ensure new chain uses absolute URLs
   for (const entry of newChain) {
-    if (
-      (typeof entry === 'string' && !entry.includes(':')) ||
-      (typeof entry === 'object' && !entry.id.includes(':'))
-    ) {
+    if (!isAbsoluteUri(typeof entry === 'string' ? entry : entry.id)) {
       throw new Error(
         'Cannot compute capability chain; parent capability chain is ' +
           'invalid because uses relative URL(s) in its capability chain.'
@@ -470,13 +477,11 @@ export async function dereferenceCapabilityChain({
 
       // ensure entry is the required type and, if it is an object, its `id`
       // is a string
-      if (
-        !(
-          entryType === requiredType &&
-          (entryIsString ||
-            (typeof entry === 'object' && typeof entry.id === 'string'))
-        )
-      ) {
+      if (!(
+        entryType === requiredType &&
+        (entryIsString ||
+          (typeof entry === 'object' && typeof entry.id === 'string'))
+      )) {
         throw new TypeError(
           'Capability chain is invalid; it must consist of strings ' +
             'of capability IDs except the last capability if it is ' +
@@ -487,7 +492,7 @@ export async function dereferenceCapabilityChain({
 
       // ensure capability ID expresses an absolute URI (i.e., it has `:`)
       const id = typeof entry === 'string' ? entry : entry.id
-      if (!id.includes(':')) {
+      if (!isAbsoluteUri(id)) {
         throw new Error(
           'Capability chain is invalid; it contains a capability ID ' +
             'that is not an absolute URI.'
@@ -606,12 +611,10 @@ export function checkProofContext({
 }): void {
   // zcap context can appear anywhere in the array as it *is* protected
   const { '@context': ctx } = proof
-  if (
-    !(
-      (Array.isArray(ctx) && ctx.includes(ZCAP_CONTEXT_URL)) ||
-      ctx === ZCAP_CONTEXT_URL
-    )
-  ) {
+  if (!(
+    (Array.isArray(ctx) && ctx.includes(ZCAP_CONTEXT_URL)) ||
+    ctx === ZCAP_CONTEXT_URL
+  )) {
     throw new Error(
       `Missing required capability proof context ("${ZCAP_CONTEXT_URL}").`
     )
@@ -711,9 +714,7 @@ export function checkCapability({
           `with "${ZCAP_CONTEXT_URL}" in its first position.`
       )
     }
-    if (
-      !(typeof parentCapability === 'string' && parentCapability.includes(':'))
-    ) {
+    if (!isAbsoluteUri(parentCapability)) {
       throw new Error(
         'Delegated capability must have a "parentCapability" with a string ' +
           'value that expresses an absolute URI.'
@@ -744,15 +745,13 @@ export function checkCapability({
     }
   }
 
-  if (!(typeof id === 'string' && id.includes(':'))) {
+  if (!isAbsoluteUri(id)) {
     throw new Error(
       'Capability must have an "id" with a string value that expresses an ' +
         'absolute URI.'
     )
   }
-  if (
-    !(typeof invocationTarget === 'string' && invocationTarget.includes(':'))
-  ) {
+  if (!isAbsoluteUri(invocationTarget)) {
     throw new Error(
       'Capability must have an "invocationTarget" with a string value that ' +
         'expresses an absolute URI.'

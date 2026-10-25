@@ -128,13 +128,11 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
     // verify params were provided and default to proof creation case to
     // avoid creating bad proofs
     if (!hasVerifyProofParams) {
-      if (
-        !(
-          typeof parentCapability === 'string' ||
-          (typeof parentCapability === 'object' &&
-            typeof parentCapability.id === 'string')
-        )
-      ) {
+      if (!(
+        typeof parentCapability === 'string' ||
+        (typeof parentCapability === 'object' &&
+          typeof parentCapability.id === 'string')
+      )) {
         throw new TypeError(
           '"parentCapability" must be a string expressing the ID of a root ' +
             'capability or an object expressing the full parent capability.'

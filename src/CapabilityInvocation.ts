@@ -155,11 +155,7 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
       if (typeof capabilityAction !== 'string') {
         throw new TypeError('"capabilityAction" must be a string.')
       }
-      if (
-        !(
-          typeof invocationTarget === 'string' && invocationTarget.includes(':')
-        )
-      ) {
+      if (!utils.isAbsoluteUri(invocationTarget)) {
         throw new TypeError(
           '"invocationTarget" must be a string that expresses an absolute URI.'
         )
@@ -172,9 +168,9 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
       if (typeof expectedAction !== 'string') {
         throw new TypeError('"expectedAction" must be a string.')
       }
-      if (
-        !(typeof expectedTarget === 'string' || Array.isArray(expectedTarget))
-      ) {
+      if (!(
+        typeof expectedTarget === 'string' || Array.isArray(expectedTarget)
+      )) {
         throw new TypeError('"expectedTarget" must be a string or array.')
       }
       // expected target values must be absolute URIs
@@ -182,7 +178,7 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
         ? expectedTarget
         : [expectedTarget]
       for (const et of expectedTargets) {
-        if (!(typeof et === 'string' && et.includes(':'))) {
+        if (!utils.isAbsoluteUri(et)) {
           throw new Error(
             '"expectedTargets" values must be absolute URI strings.'
           )
@@ -245,12 +241,10 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     }
 
     // ensure basic purpose and expected action match the proof
-    if (
-      !(
-        (await super.match(proof, { document, documentLoader })) &&
-        expectedAction === proof.capabilityAction
-      )
-    ) {
+    if (!(
+      (await super.match(proof, { document, documentLoader })) &&
+      expectedAction === proof.capabilityAction
+    )) {
       return false
     }
 
@@ -346,9 +340,7 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     `invocationTarget` specified in the invoked capability. */
     const capabilityTarget = utils.getTarget({ capability })
     const { invocationTarget } = proof
-    if (
-      !(typeof invocationTarget === 'string' && invocationTarget.includes(':'))
-    ) {
+    if (!utils.isAbsoluteUri(invocationTarget)) {
       throw new TypeError(
         `Invocation target (${invocationTarget}) must be a string that ` +
           'expresses an absolute URI.'
@@ -372,14 +364,12 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     that was invoked, but this check ensures that the invocation target used
     matches the endpoint (the `expectedTarget`) where the capability was
     actually invoked. */
-    if (
-      !(
-        (Array.isArray(expectedTarget) &&
-          expectedTarget.includes(invocationTarget)) ||
-        (typeof expectedTarget === 'string' &&
-          invocationTarget === expectedTarget)
-      )
-    ) {
+    if (!(
+      (Array.isArray(expectedTarget) &&
+        expectedTarget.includes(invocationTarget)) ||
+      (typeof expectedTarget === 'string' &&
+        invocationTarget === expectedTarget)
+    )) {
       throw new Error(
         `Expected target (${String(expectedTarget)}) does not match ` +
           `invocation target (${invocationTarget}).`
@@ -469,7 +459,9 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
           maxClockSkew
         }) > 0
       ) {
-        throw new utils.CapabilityExpiredError('The invoked capability has expired.')
+        throw new utils.CapabilityExpiredError(
+          'The invoked capability has expired.'
+        )
       }
     }
 
