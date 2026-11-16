@@ -12,6 +12,7 @@ import type {
 } from '@interop/jsonld-signatures'
 import type {
   ICapabilityDelegationProof,
+  ICaveat,
   IDelegatedZcap,
   IRootZcap,
   IZcap
@@ -399,6 +400,8 @@ export function computeCapabilityChain({
  *   it must not be untrusted input).
  * @param options.maxChainLength - The maximum length of the capability
  *   delegation chain (this is inclusive of `capability` itself).
+ * @param options.allowedContexts - The JSON-LD context URLs a delegated zcap
+ *   in the chain may list besides the zcap context (see `checkCapability`).
  *
  * @returns Resolves to an object containing the full dereferenced chain ordered
  *   root to tail.
@@ -406,11 +409,13 @@ export function computeCapabilityChain({
 export async function dereferenceCapabilityChain({
   capability,
   getRootCapability,
-  maxChainLength = MAX_CHAIN_LENGTH
+  maxChainLength = MAX_CHAIN_LENGTH,
+  allowedContexts
 }: {
   capability: string | IDelegatedZcap
   getRootCapability: GetRootCapability
   maxChainLength?: number
+  allowedContexts?: string[]
 }): Promise<{ dereferencedChain: IZcap[] }> {
   // capability MUST be a string if it is root; root zcaps MUST always be
   // dereferenced via a trusted mechanism provided by the verifier as they
@@ -429,7 +434,7 @@ export async function dereferenceCapabilityChain({
     tailCapability = rootCapability
   } else {
     // ensure capability itself is valid
-    checkCapability({ capability, expectRoot: false })
+    checkCapability({ capability, expectRoot: false, allowedContexts })
     tailCapability = capability
   }
 
@@ -513,7 +518,11 @@ export async function dereferenceCapabilityChain({
 
       if (typeof entry !== 'string') {
         // check zcap data model
-        checkCapability({ capability: entry, expectRoot: i === 0 })
+        checkCapability({
+          capability: entry,
+          expectRoot: i === 0,
+          allowedContexts
+        })
       }
 
       // ensure no cycles in the capability chain
@@ -664,6 +673,78 @@ export function hasValidAllowedAction({
 }
 
 /**
+ * Gets the caveats carried by a capability. A `caveat` value is a single
+ * caveat object or an array of them. Each caveat must have a `type` that is a
+ * non-empty string.
+ *
+ * @param options - The options.
+ * @param options.capability - The capability to read the caveats from.
+ *
+ * @returns The caveats (an empty array if the capability carries none).
+ *
+ * @throws {UnsupportedCaveatError} If `caveat` is present but malformed.
+ */
+export function getCaveats({ capability }: { capability: IZcap }): ICaveat[] {
+  const { caveat }: { caveat?: unknown } = capability
+  if (caveat === undefined) {
+    return []
+  }
+  const caveats: unknown[] = Array.isArray(caveat) ? caveat : [caveat]
+  for (const entry of caveats) {
+    const type = (entry as { type?: unknown } | null)?.type
+    if (typeof type !== 'string' || type === '') {
+      throw new UnsupportedCaveatError(
+        `Capability "${capability.id}" has a malformed "caveat"; each caveat ` +
+          'must be an object with a "type" that is a non-empty string.'
+      )
+    }
+  }
+  return caveats as ICaveat[]
+}
+
+/**
+ * Asserts that every property name in a JSON value, at any depth, is a plain
+ * term. A name that contains `:` (an IRI or compact IRI) or starts with `@` (a
+ * JSON-LD keyword) is refused.
+ *
+ * @param options - The options.
+ * @param options.value - The JSON value to check.
+ * @param options.skip - Top-level property names to leave unchecked, values
+ *   included.
+ *
+ * @throws {Error} If a property name is not a plain term.
+ */
+function checkPropertyNames({
+  value,
+  skip = []
+}: {
+  value: unknown
+  skip?: string[]
+}): void {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      checkPropertyNames({ value: entry })
+    }
+    return
+  }
+  if (typeof value !== 'object' || value === null) {
+    return
+  }
+  for (const [name, child] of Object.entries(value)) {
+    if (skip.includes(name)) {
+      continue
+    }
+    if (name.startsWith('@') || name.includes(':')) {
+      throw new Error(
+        `Capability property name "${name}" is not allowed; property names ` +
+          'must be plain terms, not IRIs or JSON-LD keywords.'
+      )
+    }
+    checkPropertyNames({ value: child })
+  }
+}
+
+/**
  * Validates the data model of a capability (root or delegated), throwing if it
  * is malformed or if its root/delegated kind does not match `expectRoot`.
  *
@@ -671,21 +752,36 @@ export function hasValidAllowedAction({
  * `invocationTarget`, `allowedAction` shape, and (for delegated zcaps) a valid
  * `parentCapability`, a `capabilityDelegation` proof with a non-empty
  * `capabilityChain` and a valid `created` date, and a valid `expires` date.
- * Root zcaps must not carry `expires`.
+ * Root zcaps must not carry `expires`. A `caveat`, if present on either kind,
+ * must be well-formed.
+ *
+ * The JSON shape is also restricted, so that a zcap signed over its RDF form
+ * has a single accepted JSON form. Every `@context` entry must be a string.
+ * Every property name, at any depth outside `proof`, must be a plain term. A
+ * name that contains `:` or starts with `@` is refused. Without these checks
+ * the holder of a zcap could move a signed `allowedAction` or `caveat` to an
+ * equivalent property name that this library does not read.
  *
  * @param options - The options.
  * @param options.capability - The capability to check.
  * @param options.expectRoot - `true` if the capability is expected to be a root
  *   zcap, `false` if it is expected to be delegated.
+ * @param options.allowedContexts - The JSON-LD context URLs a delegated zcap
+ *   may list besides the zcap context. If omitted, any context URL is
+ *   accepted. A verifier should always pass it.
  *
  * @throws {Error} If the capability is invalid or of an unexpected kind.
+ * @throws {UnsupportedCaveatError} If the capability carries a malformed
+ *   `caveat`.
  */
 export function checkCapability({
   capability,
-  expectRoot
+  expectRoot,
+  allowedContexts
 }: {
   capability: IZcap
   expectRoot: boolean
+  allowedContexts?: string[]
 }): void {
   const context = capability['@context']
   const { id, invocationTarget } = capability
@@ -713,6 +809,24 @@ export function checkCapability({
         'Delegated capability must have an "@context" array ' +
           `with "${ZCAP_CONTEXT_URL}" in its first position.`
       )
+    }
+    for (const entry of context as unknown[]) {
+      // an inline context object could alias any zcap term
+      if (typeof entry !== 'string') {
+        throw new Error(
+          'Delegated capability "@context" entries must be strings.'
+        )
+      }
+      if (
+        allowedContexts !== undefined &&
+        entry !== ZCAP_CONTEXT_URL &&
+        !allowedContexts.includes(entry)
+      ) {
+        throw new Error(
+          `Delegated capability has an "@context" entry ("${entry}") that ` +
+            'is not allowed.'
+        )
+      }
     }
     if (!isAbsoluteUri(parentCapability)) {
       throw new Error(
@@ -744,6 +858,13 @@ export function checkCapability({
       throw new Error('Delegated capability must have a valid expires date.')
     }
   }
+
+  // property names must be plain terms; `proof` is left to the proof suite,
+  // and any zcap embedded in it is checked as its own chain entry
+  checkPropertyNames({ value: capability, skip: ['@context', 'proof'] })
+
+  // throws if `caveat` is present but malformed
+  getCaveats({ capability })
 
   if (!isAbsoluteUri(id)) {
     throw new Error(
@@ -839,5 +960,30 @@ export class CapabilityExpiredError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'CapabilityExpiredError'
+  }
+}
+
+/**
+ * Thrown when a capability (root or delegated) carries a caveat that the
+ * verifier does not support. This covers a caveat whose type has no registered handler and
+ * a malformed `caveat` value. Callers should check `name` rather than use
+ * `instanceof`.
+ */
+export class UnsupportedCaveatError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'UnsupportedCaveatError'
+  }
+}
+
+/**
+ * Thrown when a caveat handler answers `valid: false` without supplying an
+ * `error` of its own. Callers should check `name` rather than use
+ * `instanceof`.
+ */
+export class CaveatNotSatisfiedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'CaveatNotSatisfiedError'
   }
 }

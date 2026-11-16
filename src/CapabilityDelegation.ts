@@ -54,6 +54,10 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
    *   to be dereferenced via a `documentLoader`.
    * @param options.inspectCapabilityChain - An async function that can be used
    *   to check for revocations related to any of verified capabilities.
+   * @param options.allowedContexts - JSON-LD context URLs a delegated zcap
+   *   may list besides the zcap context and each suite's context.
+   * @param options.maxCaveats - The maximum number of caveats in the
+   *   capability chain, counted across every capability in it.
    * @param options.maxChainLength - The maximum length of the capability
    *   delegation chain.
    * @param options.maxClockSkew - A maximum number of seconds that clocks may
@@ -64,6 +68,9 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
    * @param options.suite - The jsonld-signature suite(s) to use to verify the
    *   capability chain. Required only in verify-proof mode; unused (and
    *   omitted) when creating a delegation proof.
+   * @param options.supportedCaveats - A `Map` of caveat type to async caveat
+   *   handler, used in verify-proof mode. A capability (root or delegated)
+   *   carrying a caveat with no handler fails verification.
    * @param options._verifiedParentCapability - Private.
    * @param options._capabilityChain - Private.
    * @param options._skipLocalValidationForTesting - Private.
@@ -73,14 +80,17 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
     parentCapability,
     // proof verification params
     allowTargetAttenuation,
+    allowedContexts,
     controller,
     date,
     expectedRootCapability,
     inspectCapabilityChain,
+    maxCaveats,
     maxChainLength,
     maxClockSkew,
     maxDelegationTtl,
     suite,
+    supportedCaveats,
     _verifiedParentCapability,
     // for testing purposes only, not documented intentionally
     _capabilityChain,
@@ -95,6 +105,7 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
       expectedRootCapability ||
       inspectCapabilityChain ||
       suite ||
+      supportedCaveats ||
       _verifiedParentCapability
 
     if (hasCreateProofParams && hasVerifyProofParams) {
@@ -107,10 +118,12 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
 
     super({
       allowTargetAttenuation,
+      allowedContexts,
       controller,
       date,
       expectedRootCapability,
       inspectCapabilityChain,
+      maxCaveats,
       maxChainLength,
       maxClockSkew,
       maxDelegationTtl,
@@ -118,6 +131,7 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
       // values are not checked for liveness, rather "expires" is used instead
       maxTimestampDelta: Infinity,
       suite,
+      supportedCaveats,
       term: 'capabilityDelegation'
     })
 

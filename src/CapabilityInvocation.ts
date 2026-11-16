@@ -65,6 +65,10 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
    *   apply to (absolute URI, or array of URIs).
    * @param options.inspectCapabilityChain - An async function that can be used
    *   to check for revocations related to any of verified capabilities.
+   * @param options.allowedContexts - JSON-LD context URLs a delegated zcap
+   *   may list besides the zcap context and each suite's context.
+   * @param options.maxCaveats - The maximum number of caveats in the
+   *   capability chain, counted across every capability in it.
    * @param options.maxChainLength - The maximum length of the capability
    *   delegation chain.
    * @param options.maxClockSkew - A maximum number of seconds that clocks may
@@ -80,6 +84,9 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
    * @param options.suite - The jsonld-signature suite(s) to use to verify the
    *   capability chain. Required only in verify-proof mode; unused (and
    *   omitted) when creating an invocation proof.
+   * @param options.supportedCaveats - A `Map` of caveat type to async caveat
+   *   handler, used in verify-proof mode. A capability (root or delegated)
+   *   carrying a caveat with no handler fails verification.
    */
   constructor({
     // proof creation params
@@ -88,17 +95,20 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     invocationTarget,
     // proof verification params
     allowTargetAttenuation,
+    allowedContexts,
     controller,
     date,
     expectedAction,
     expectedRootCapability,
     expectedTarget,
     inspectCapabilityChain,
+    maxCaveats,
     maxChainLength,
     maxClockSkew,
     maxDelegationTtl,
     maxTimestampDelta,
-    suite
+    suite,
+    supportedCaveats
   }: CapabilityInvocationOptions = {}) {
     // parameters used to create a proof
     const hasCreateProofParams =
@@ -111,7 +121,8 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
       expectedRootCapability ||
       expectedTarget ||
       inspectCapabilityChain ||
-      suite
+      suite ||
+      supportedCaveats
 
     if (hasCreateProofParams && hasVerifyProofParams) {
       // cannot provide both create and verify params
@@ -123,15 +134,18 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
 
     super({
       allowTargetAttenuation,
+      allowedContexts,
       controller,
       date,
       expectedRootCapability,
       inspectCapabilityChain,
+      maxCaveats,
       maxChainLength,
       maxClockSkew,
       maxDelegationTtl,
       maxTimestampDelta,
       suite,
+      supportedCaveats,
       term: 'capabilityInvocation'
     })
 

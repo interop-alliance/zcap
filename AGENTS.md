@@ -62,14 +62,25 @@ Key invariants enforced at each link:
 - `expires` may only be made earlier, never later.
 - Delegation timestamp must not be before the parent's delegation timestamp.
 - Chain must not contain cycles.
+- A zcap (root or delegated) may carry `caveat` (one object or an array, each
+  with a string `type`). Verification fails unless every caveat type in the
+  chain has a handler in the verifier's `supportedCaveats` map. With no map, any
+  caveat is refused.
+- A zcap has a single accepted JSON form. Property names must be plain terms (no
+  `:`, no leading `@`) at any depth outside `proof`. A delegated zcap's
+  `@context` entries must be strings, and when verifying they must come from the
+  zcap context, the suite contexts or the `allowedContexts` option. This stops a
+  holder from re-serializing a zcap signed over its RDF form.
 - Default max chain length: `MAX_CHAIN_LENGTH = 10`.
+- Default max caveats per chain: `MAX_CAVEATS = 100` (`maxCaveats` option).
 
 ### Source Files
 
 ```
 src/
   index.ts                  Public API surface (exports + documentLoader)
-  constants.ts              ZCAP_CONTEXT_URL, ZCAP_ROOT_PREFIX, MAX_CHAIN_LENGTH
+  constants.ts              ZCAP_CONTEXT_URL, ZCAP_ROOT_PREFIX, MAX_CHAIN_LENGTH,
+                            MAX_CAVEATS
   types.ts                  Local zcap option/result interfaces; re-exports the
                             shared zcap interfaces from data-integrity-core
   declarations.d.ts         Ambient module shims for untyped deps
@@ -84,8 +95,8 @@ src/
   utils.ts                  Pure helpers: createRootCapability,
                             dereferenceCapabilityChain, checkCapability,
                             computeCapabilityChain, isValidTarget, isAbsoluteUri,
-                            getAllowedActions, getDelegationProofs, compareTime;
-                            also the CapabilityExpiredError class
+                            getAllowedActions, getCaveats, getDelegationProofs,
+                            compareTime; also the error classes
 ```
 
 ### Public API
@@ -99,6 +110,9 @@ import {
   isValidTarget, // invocation-target prefix check (allowTargetAttenuation)
   CapabilityExpiredError, // Error subclass (name 'CapabilityExpiredError')
   // thrown by every expiry check; match on `name`, not `instanceof`
+  UnsupportedCaveatError, // a zcap in the chain carries a caveat with no handler
+  // (or a malformed one); match on `name`
+  CaveatNotSatisfiedError, // a caveat handler answered `valid: false`
   constants, // { ZCAP_CONTEXT_URL, ZCAP_ROOT_PREFIX, ... }
   documentLoader, // default loader (zcap + jsigs contexts only)
   extendDocumentLoader // wrap an existing loader to also serve zcap context
@@ -130,8 +144,19 @@ delegation invariants (allowedAction, target, expires, timing, TTL). Uses
 `_verifiedParentCapability` to avoid re-verifying already-checked parent
 segments.
 
-**`inspectCapabilityChain`** hook: After chain verification succeeds, calls a
-user-supplied async function with the full
+**`_resolveCaveats`** (`CapabilityProofPurpose.ts`): Runs right after the chain
+is dereferenced, before any proof is verified. Collects the caveats of every
+zcap in the chain (root included). Refuses the chain if it holds more than
+`maxCaveats` caveats or if any type lacks a handler. The collected
+`[{caveat, capability}]` list is returned as `caveats` on the purpose result and
+passed to `inspectCapabilityChain`.
+
+**`_runCaveatHandlers`** (`CapabilityProofPurpose.ts`): Runs last, after chain
+verification and the `inspectCapabilityChain` hook. Calls each handler with the
+caveat, its zcap, the chain and the proof being verified.
+
+**`inspectCapabilityChain`** hook: After chain verification succeeds (and before
+the caveat handlers), calls a user-supplied async function with the full
 `{capabilityChain, capabilityChainMeta}` — the intended extension point for
 revocation checks.
 

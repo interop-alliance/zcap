@@ -25,3 +25,9 @@ export const ZCAP_ROOT_PREFIX = 'urn:zcap:root:'
 // 6 is probably more reasonable for Kevin Bacon reasons? but picking a
 // power of 10
 export const MAX_CHAIN_LENGTH = 10
+
+/**
+ * Default maximum number of caveats in a capability chain, counted across
+ * every capability in the chain (the root included).
+ */
+export const MAX_CAVEATS = 100

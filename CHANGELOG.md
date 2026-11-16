@@ -1,5 +1,44 @@
 # @interop/zcap ChangeLog
 
+## 12.0.0 - TBD
+
+### Changed
+
+- **BREAKING**: Verification fails when any capability in the chain carries a
+  `caveat` that the verifier does not support. Previously the property was
+  ignored and the capability verified as if unrestricted. The check covers the
+  root and every delegated link, under both `CapabilityInvocation` and
+  `CapabilityDelegation`. The error `name` is `UnsupportedCaveatError`.
+- **BREAKING**: `checkCapability` rejects a capability (root or delegated) with
+  a malformed `caveat`. A `caveat` value is one object or an array of objects,
+  each with a non-empty string `type`.
+- **BREAKING**: `checkCapability` and verification refuse a capability with a
+  property name that contains `:` or starts with `@`, at any depth outside
+  `proof`. They also refuse a delegated capability with a non-string `@context`
+  entry. This stops the holder of a capability signed over its RDF form from
+  moving `allowedAction` or `caveat` to an equivalent property name.
+- **BREAKING**: Verification refuses a delegated capability that lists a
+  `@context` URL other than the zcap context, the context of a `suite` passed to
+  the purpose, or a URL in the new `allowedContexts` option.
+
+### Added
+
+- `supportedCaveats` verify option, a `Map` of caveat type to async handler
+  `({caveat, capability, capabilityChain, proof, proofPurpose, capabilityAction, invocationTarget, date}) => ({valid, error?})`.
+  Registering a handler marks its caveat type as supported. Handlers run after
+  the chain is verified and `inspectCapabilityChain` has accepted it, once per
+  caveat of their type. A chain with an unsupported caveat is refused before any
+  delegation proof is verified. A `valid: false` answer fails the chain with the
+  handler's `error`, or a `CaveatNotSatisfiedError` if none is given.
+- `allowedContexts` verify option, the extra JSON-LD context URLs a delegated
+  capability may list. `checkCapability` takes the same option.
+- `maxCaveats` verify option, the maximum number of caveats across the whole
+  chain. Defaults to `constants.MAX_CAVEATS` (100).
+- `caveats` on the proof purpose result and on the `inspectCapabilityChain`
+  details. It lists each caveat found with the capability that carries it, so a
+  caller can enforce caveats a handler accepted but could not decide.
+- Export `UnsupportedCaveatError` and `CaveatNotSatisfiedError`.
+
 ## 11.4.0 - 2026-10-24
 
 ### Added

@@ -10,6 +10,8 @@ export { CapabilityInvocation } from './CapabilityInvocation.js'
 export { CapabilityDelegation } from './CapabilityDelegation.js'
 export {
   CapabilityExpiredError,
+  CaveatNotSatisfiedError,
+  UnsupportedCaveatError,
   checkCapability,
   createRootCapability,
   isValidTarget
@@ -18,8 +20,10 @@ export { constants }
 
 /* Type exports */
 export type {
+  CapabilityCaveat,
   CapabilityChainDetails,
   CapabilityMeta,
+  CaveatHandler,
   InspectCapabilityChain,
   InspectResult,
   VerifyResult,
@@ -30,6 +34,8 @@ export type {
   CapabilityValidateResult,
   GetRootCapability
 } from './types.js'
+
+export type { ICaveat } from '@interop/data-integrity-core/zcap'
 
 /**
  * Wraps an existing document loader so that it also serves the zcap JSON-LD
