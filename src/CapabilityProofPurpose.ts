@@ -2,6 +2,7 @@
  * Copyright (c) 2018-2024 Digital Bazaar, Inc. All rights reserved.
  */
 import * as utils from './utils.js'
+import { MAX_CAVEATS } from './constants.js'
 import jsigs from '@interop/jsonld-signatures'
 import type {
   IProofDescription,
@@ -14,10 +15,12 @@ import type {
 } from '@interop/data-integrity-core/zcap'
 import type { IDocumentLoader } from '@interop/data-integrity-core/loader'
 import type {
+  CapabilityCaveat,
   CapabilityDelegationOptions,
   CapabilityMeta,
   CapabilityProofPurposeOptions,
   CapabilityValidateResult,
+  CaveatHandler,
   InspectCapabilityChain,
   ValidateOptions
 } from './types.js'
@@ -38,10 +41,13 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
   allowTargetAttenuation?: boolean
   expectedRootCapability?: string | string[]
   inspectCapabilityChain?: InspectCapabilityChain
+  allowedContexts?: string[]
+  maxCaveats?: number
   maxChainLength?: number
   maxClockSkew?: number
   maxDelegationTtl?: number
   suite?: LinkedDataProof | LinkedDataProof[]
+  supportedCaveats?: Map<string, CaveatHandler>
 
   /**
    * @param options - The options.
@@ -59,6 +65,10 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
    *   acceptable root capability ID strings).
    * @param options.inspectCapabilityChain - An async function that can be used
    *   to check for revocations related to any of verified capabilities.
+   * @param options.allowedContexts - JSON-LD context URLs a delegated zcap
+   *   may list besides the zcap context and each suite's context.
+   * @param options.maxCaveats - The maximum number of caveats in the
+   *   capability chain, counted across every capability in it.
    * @param options.maxChainLength - The maximum length of the capability
    *   delegation chain.
    * @param options.maxClockSkew - A maximum number of seconds that clocks may
@@ -74,6 +84,9 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
    * @param options.suite - The jsonld-signature suite(s) to use to verify the
    *   capability chain. Required only when verifying a proof; unused (and
    *   omitted) when creating a delegation proof.
+   * @param options.supportedCaveats - A `Map` of caveat type to async caveat
+   *   handler. A capability (root or delegated) carrying a caveat with no
+   *   handler fails verification.
    * @param options.term - The term `capabilityInvocation` or
    *   `capabilityDelegation` to look for in an LD proof.
    */
@@ -81,15 +94,18 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
     {
       // proof verification params (and common to all derived classes)
       allowTargetAttenuation = false,
+      allowedContexts = [],
       controller,
       date,
       expectedRootCapability,
       inspectCapabilityChain,
+      maxCaveats = MAX_CAVEATS,
       maxChainLength,
       maxDelegationTtl = Infinity,
       maxTimestampDelta = Infinity,
       maxClockSkew = 300,
       suite,
+      supportedCaveats,
       term
     }: CapabilityProofPurposeOptions = {} as CapabilityProofPurposeOptions
   ) {
@@ -101,7 +117,8 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
       date ||
       expectedRootCapability ||
       inspectCapabilityChain ||
-      suite
+      suite ||
+      supportedCaveats
     if (hasVerifyProofParams) {
       if (!(
         typeof expectedRootCapability === 'string' ||
@@ -128,13 +145,57 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
         throw new TypeError('"maxClockSkew" must be a number.')
       }
 
+      if (!(
+        Array.isArray(allowedContexts) &&
+        allowedContexts.every(url => typeof url === 'string')
+      )) {
+        throw new TypeError('"allowedContexts" must be an array of strings.')
+      }
+
+      if (typeof maxCaveats !== 'number') {
+        throw new TypeError('"maxCaveats" must be a number.')
+      }
+
+      if (supportedCaveats !== undefined) {
+        // `instanceof Map` fails for a Map created in another realm
+        if (
+          Object.prototype.toString.call(supportedCaveats) !== '[object Map]'
+        ) {
+          throw new TypeError('"supportedCaveats" must be a Map.')
+        }
+        for (const [type, handler] of supportedCaveats) {
+          if (typeof type !== 'string' || type === '') {
+            throw new TypeError(
+              '"supportedCaveats" keys must be non-empty caveat type strings.'
+            )
+          }
+          if (typeof handler !== 'function') {
+            throw new TypeError(
+              `The "supportedCaveats" handler for caveat type "${type}" ` +
+                'must be a function.'
+            )
+          }
+        }
+      }
+
       this.allowTargetAttenuation = allowTargetAttenuation
+      // a delegated zcap may also list the context of any suite used to
+      // verify it
+      this.allowedContexts = [
+        ...allowedContexts,
+        ...[suite].flat().flatMap(s => {
+          const { contextUrl } = (s ?? {}) as { contextUrl?: unknown }
+          return typeof contextUrl === 'string' ? [contextUrl] : []
+        })
+      ]
       this.expectedRootCapability = expectedRootCapability
       this.inspectCapabilityChain = inspectCapabilityChain
+      this.maxCaveats = maxCaveats
       this.maxChainLength = maxChainLength
       this.maxClockSkew = maxClockSkew
       this.maxDelegationTtl = maxDelegationTtl
       this.suite = suite
+      this.supportedCaveats = supportedCaveats
     }
   }
 
@@ -204,7 +265,13 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
       as the return value for this function).
     5. Run the `inspectCapabilityChain` hook, if given, to allow for custom
       implementations to check for revoked zcaps in databases or whatever other
-      behavior is desired. */
+      behavior is desired.
+    6. Call the caveat handlers for every caveat in the now verified chain,
+      the root included (see `_runCaveatHandlers`).
+
+    The caveats are collected right after step 1 (see `_resolveCaveats`), so a
+    chain with an unsupported caveat is refused before any proof is
+    verified. */
 
     try {
       // ensure proof has expected context (even though this is called in
@@ -232,6 +299,12 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
         documentLoader,
         proof
       })
+
+      /* Collect the caveats in the chain and look up their handlers. No
+      handler is called yet. Doing this before chain verification refuses a
+      chain with an unsupported caveat, or too many caveats, without any
+      signature work. */
+      const caveats = this._resolveCaveats({ dereferencedChain })
 
       /* 2. Run any proof-purpose-specific early checks prior to chain
       verification. */
@@ -273,15 +346,22 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
           // full chain, including root zcap
           capabilityChain: dereferencedChain,
           // capability chain meta including `null` for root zcap
-          capabilityChainMeta: [{ verifyResult: null }, ...capabilityChainMeta]
+          capabilityChainMeta: [{ verifyResult: null }, ...capabilityChainMeta],
+          caveats
         })
         if (!valid) {
           throw error
         }
       }
 
-      // include dereferenced chain result
+      /* 6. Call the caveat handlers. This runs only after the whole chain is
+      verified and inspected, so handlers never see an unverified or revoked
+      capability. */
+      await this._runCaveatHandlers({ caveats, dereferencedChain, proof })
+
+      // include dereferenced chain and caveats in result
       validateResult.dereferencedChain = dereferencedChain
+      validateResult.caveats = caveats
 
       return validateResult
     } catch (error) {
@@ -313,7 +393,7 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
     documentLoader?: IDocumentLoader
     proof: IProofDescription
   }): Promise<{ dereferencedChain: IZcap[] }> {
-    const { expectedRootCapability, maxChainLength } = this
+    const { allowedContexts, expectedRootCapability, maxChainLength } = this
     const { capability } = this._getTailCapability({ document, proof })
     const { dereferencedChain } = await utils.dereferenceCapabilityChain({
       capability: capability as string | IDelegatedZcap,
@@ -337,9 +417,107 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
         const { document } = await documentLoader!(id)
         return { rootCapability: document as IRootZcap }
       },
-      maxChainLength
+      maxChainLength,
+      allowedContexts
     })
     return { dereferencedChain }
+  }
+
+  /**
+   * Collects the caveats carried by every capability in a chain, the root
+   * included, and looks up the handler for each. Calls no handler. It only
+   * ever refuses a chain, so it is safe to run before the chain is verified.
+   *
+   * @param options - The options.
+   * @param options.dereferencedChain - The chain (root to tail).
+   *
+   * @returns The caveats found in chain order, each with the capability
+   *   carrying it.
+   *
+   * @throws {Error} If the chain carries more than `maxCaveats` caveats.
+   * @throws {UnsupportedCaveatError} If a caveat is malformed or has no
+   *   handler in `supportedCaveats`.
+   */
+  _resolveCaveats({
+    dereferencedChain
+  }: {
+    dereferencedChain: IZcap[]
+  }): CapabilityCaveat[] {
+    const { maxCaveats = MAX_CAVEATS, supportedCaveats } = this
+    const found: CapabilityCaveat[] = []
+
+    let caveatCount = 0
+    for (const capability of dereferencedChain) {
+      const caveats = utils.getCaveats({ capability })
+      caveatCount += caveats.length
+      if (caveatCount > maxCaveats) {
+        throw new Error(
+          'The capability chain exceeds the maximum allowed number of ' +
+            `caveats of ${maxCaveats}.`
+        )
+      }
+      for (const caveat of caveats) {
+        if (!supportedCaveats?.has(caveat.type)) {
+          throw new utils.UnsupportedCaveatError(
+            `Capability "${capability.id}" carries an unsupported caveat ` +
+              `of type "${caveat.type}".`
+          )
+        }
+        found.push({ caveat, capability })
+      }
+    }
+    return found
+  }
+
+  /**
+   * Calls the handler of every caveat in a verified chain, once per caveat,
+   * in chain order (root to tail).
+   *
+   * @param options - The options.
+   * @param options.caveats - The caveats from `_resolveCaveats`, each with a
+   *   handler in `supportedCaveats`.
+   * @param options.dereferencedChain - The verified chain (root to tail).
+   * @param options.proof - The proof being validated, passed to each handler.
+   *
+   * @throws {CaveatNotSatisfiedError} If a handler answers `valid: false`
+   *   without an `error` (otherwise that `error` is thrown).
+   */
+  async _runCaveatHandlers({
+    caveats,
+    dereferencedChain,
+    proof
+  }: {
+    caveats: CapabilityCaveat[]
+    dereferencedChain: IZcap[]
+    proof: IProofDescription
+  }): Promise<void> {
+    const { date, supportedCaveats } = this
+    const currentDate = (date && new Date(date)) || new Date()
+
+    for (const { caveat, capability } of caveats) {
+      const handler = supportedCaveats!.get(caveat.type)!
+      const { valid, error } = await handler({
+        caveat,
+        capability,
+        capabilityChain: dereferencedChain,
+        proof,
+        proofPurpose: this.term as
+          'capabilityInvocation' | 'capabilityDelegation',
+        // only an invocation proof carries these
+        capabilityAction: proof.capabilityAction as string | undefined,
+        invocationTarget: proof.invocationTarget as string | undefined,
+        date: currentDate
+      })
+      if (!valid) {
+        throw (
+          error ??
+          new utils.CaveatNotSatisfiedError(
+            `The caveat of type "${caveat.type}" on capability ` +
+              `"${capability.id}" is not satisfied.`
+          )
+        )
+      }
+    }
   }
 
   /**
@@ -525,7 +703,9 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
         const zcap = delegatedCapabilities[i]!
         /* Note: Passing `_verifiedParentCapability` will prevent repetitive
         checking of the same segments of the chain (once a parent is verified,
-        its chain is not checked again when checking its children). */
+        its chain is not checked again when checking its children). That
+        short-circuit also skips the caveat and context checks, which this
+        purpose has already run for the whole chain. */
         const _verifiedParentCapability = delegatedCapabilities[i - 1] || root
 
         // verify proof on zcap if no result has been computed yet (one

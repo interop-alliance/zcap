@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { runInNewContext } from 'node:vm'
 import jsigs from '@interop/jsonld-signatures'
 import { Ed25519Signature2020 } from '@interop/ed25519-signature'
 import { Ed25519VerificationKey } from '@interop/ed25519-verification-key'
@@ -5249,6 +5250,839 @@ describe('zcap', () => {
         }
       )
     }) // end Path-based hierarchical attenuation
+  })
+  describe('Caveats', () => {
+    const CAVEAT_TYPE = 'urn:example:caveat:OwnResourcesOnly'
+    const OTHER_CAVEAT_TYPE = 'urn:example:caveat:Other'
+
+    // delegates `parentCapability` to `controller` with the given `caveat`
+    async function _delegateWithCaveat({
+      parentCapability,
+      controller,
+      delegator,
+      caveat,
+      purposeOptions
+    }) {
+      return _delegate({
+        newCapability: {
+          '@context': ZCAP_CONTEXT_URL,
+          id: uuid(),
+          controller: controller.id(),
+          parentCapability: parentCapability.id,
+          invocationTarget: parentCapability.invocationTarget,
+          expires: EXPIRES_3000_DATE,
+          caveat
+        },
+        parentCapability,
+        delegator,
+        purposeOptions
+      })
+    }
+
+    async function _invokeAsCarol({ bobCaveat, carolCaveat }) {
+      const bobZcap = await _delegateWithCaveat({
+        parentCapability: capabilities.root.beta,
+        controller: bob,
+        delegator: alice,
+        caveat: bobCaveat
+      })
+      const carolZcap = await _delegateWithCaveat({
+        parentCapability: bobZcap,
+        controller: carol,
+        delegator: bob,
+        caveat: carolCaveat
+      })
+      const invocation = await _invoke({
+        doc: clone(mock.exampleDoc),
+        invoker: carol,
+        capability: carolZcap,
+        capabilityAction: 'read'
+      })
+      return { bobZcap, carolZcap, invocation }
+    }
+
+    // asserts that verification failed with an error of the given name
+    function _expectFailure(result, name) {
+      expect(result.verified).toBe(false)
+      const [error] = result.error.errors
+      expect(error.name).toBe(name)
+      return error
+    }
+
+    describe('re-serialized zcaps', () => {
+      const SEC = 'https://w3id.org/security#'
+      const KEY_ERROR = 'must be plain terms'
+
+      // Bob holds a zcap limited to "read" and carrying a caveat; `forge`
+      // rewrites it after signing and Bob then invokes `capabilityAction`
+      async function _invokeForged(options) {
+        const { result, called } = await _runForged(options)
+        expect(result.verified).toBe(false)
+        expect(called).toBe(false)
+        return result.error.errors[0]
+      }
+
+      async function _verifyForgedWith(options) {
+        const { result } = await _runForged(options)
+        return result
+      }
+
+      async function _runForged({
+        forge,
+        capabilityAction = 'read',
+        purposeOptions = {}
+      }) {
+        const bobZcap = await _delegate({
+          newCapability: {
+            '@context': ZCAP_CONTEXT_URL,
+            id: uuid(),
+            controller: bob.id(),
+            parentCapability: capabilities.root.beta.id,
+            invocationTarget: capabilities.root.beta.invocationTarget,
+            expires: EXPIRES_3000_DATE,
+            allowedAction: 'read',
+            caveat: [{ type: CAVEAT_TYPE }]
+          },
+          parentCapability: capabilities.root.beta,
+          delegator: alice
+        })
+        const forged = clone(bobZcap)
+        forge(forged)
+        let called = false
+        const result = await _verifyInvocation({
+          invocation: await _invoke({
+            doc: clone(mock.exampleDoc),
+            invoker: bob,
+            capability: forged,
+            capabilityAction
+          }),
+          rootCapability: capabilities.root.beta,
+          expectedAction: capabilityAction,
+          purposeOptions: {
+            supportedCaveats: new Map([
+              [
+                CAVEAT_TYPE,
+                async () => {
+                  called = true
+                  return { valid: true }
+                }
+              ]
+            ]),
+            ...purposeOptions
+          }
+        })
+        return { result, called }
+      }
+
+      it('should verify the zcap as signed', async () => {
+        // sanity check: only the rewrites below make verification fail
+        const error = await _invokeForged({
+          forge: () => {},
+          purposeOptions: {
+            supportedCaveats: new Map([
+              [CAVEAT_TYPE, async () => ({ valid: false })]
+            ])
+          }
+        })
+        expect(error.name).toBe('CaveatNotSatisfiedError')
+      })
+
+      it('should refuse "allowedAction" moved to its IRI', async () => {
+        const error = await _invokeForged({
+          capabilityAction: 'write',
+          forge: zcap => {
+            zcap[`${SEC}allowedAction`] = zcap.allowedAction
+            delete zcap.allowedAction
+          }
+        })
+        expect(error.message).toContain(KEY_ERROR)
+      })
+
+      it('should refuse "caveat" moved to its IRI', async () => {
+        const error = await _invokeForged({
+          forge: zcap => {
+            zcap[`${SEC}caveat`] = zcap.caveat
+            delete zcap.caveat
+          }
+        })
+        expect(error.message).toContain(KEY_ERROR)
+      })
+
+      it('should refuse "caveat" moved under a JSON-LD keyword', async () => {
+        const error = await _invokeForged({
+          forge: zcap => {
+            zcap['@included'] = [{ id: zcap.id, caveat: zcap.caveat }]
+            delete zcap.caveat
+          }
+        })
+        expect(error.message).toContain(KEY_ERROR)
+      })
+
+      it('should refuse a caveat property renamed to an IRI', async () => {
+        const error = await _invokeForged({
+          forge: zcap => {
+            zcap.caveat = [{ '@type': CAVEAT_TYPE }]
+          }
+        })
+        expect(error.message).toContain(KEY_ERROR)
+      })
+
+      it('should refuse a keyword nested inside a caveat', async () => {
+        const error = await _invokeForged({
+          forge: zcap => {
+            zcap.caveat = [
+              { type: CAVEAT_TYPE, controller: [{ '@id': 'urn:example:a' }] }
+            ]
+          }
+        })
+        expect(error.message).toContain(KEY_ERROR)
+      })
+
+      it('should refuse "caveat" aliased by an inline context', async () => {
+        const error = await _invokeForged({
+          forge: zcap => {
+            zcap['@context'].push({ cav: `${SEC}caveat` })
+            zcap.cav = zcap.caveat
+            delete zcap.caveat
+          }
+        })
+        expect(error.message).toBe(
+          'Delegated capability "@context" entries must be strings.'
+        )
+      })
+
+      it('should refuse a context that is not allowed', async () => {
+        // a context the loader serves, which aliases the "caveat" term
+        const url = 'https://example.com/contexts/aliases/v1'
+        addToLoader({ doc: { id: url, '@context': { cav: `${SEC}caveat` } } })
+        const forge = zcap => {
+          zcap['@context'].push(url)
+          zcap.cav = zcap.caveat
+          delete zcap.caveat
+        }
+        const error = await _invokeForged({ forge })
+        expect(error.message).toBe(
+          `Delegated capability has an "@context" entry ("${url}") that ` +
+            'is not allowed.'
+        )
+
+        // a verifier that allows the context accepts its terms; the caveat
+        // is then no longer under the "caveat" property the library reads
+        const allowed = await _verifyForgedWith({
+          forge,
+          purposeOptions: { allowedContexts: [url] }
+        })
+        expect(allowed.verified).toBe(true)
+        expect(allowed.results[0].purposeResult.caveats).toEqual([])
+      })
+
+      it('should throw if "allowedContexts" is not an array of strings', async () => {
+        expect(
+          () =>
+            new CapabilityDelegation({
+              expectedRootCapability: capabilities.root.beta.id,
+              suite: new Ed25519Signature2020(),
+              allowedContexts: 'https://example.com/v1' as any
+            })
+        ).toThrow('"allowedContexts" must be an array of strings.')
+      })
+
+      it('should fail to delegate a zcap with an IRI property name', async () => {
+        await expect(
+          _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: bob.id(),
+              parentCapability: capabilities.root.beta.id,
+              invocationTarget: capabilities.root.beta.invocationTarget,
+              expires: EXPIRES_3000_DATE,
+              [`${SEC}allowedAction`]: 'read'
+            },
+            parentCapability: capabilities.root.beta,
+            delegator: alice
+          })
+        ).rejects.toThrow(KEY_ERROR)
+      })
+    })
+
+    describe('without "supportedCaveats"', () => {
+      it('should fail to verify a delegation with a caveat', async () => {
+        const bobZcap = await _delegateWithCaveat({
+          parentCapability: capabilities.root.beta,
+          controller: bob,
+          delegator: alice,
+          caveat: [{ type: CAVEAT_TYPE }]
+        })
+        const result = await _verifyDelegation({
+          delegation: bobZcap,
+          expectedRootCapability: capabilities.root.beta.id
+        })
+        const error = _expectFailure(result, 'UnsupportedCaveatError')
+        expect(error.message).toContain(CAVEAT_TYPE)
+      })
+
+      it('should fail to verify a delegation whose parent has a caveat', async () => {
+        const bobZcap = await _delegateWithCaveat({
+          parentCapability: capabilities.root.beta,
+          controller: bob,
+          delegator: alice,
+          caveat: { type: CAVEAT_TYPE }
+        })
+        const carolZcap = await _delegate({
+          parentCapability: bobZcap,
+          controller: carol,
+          delegator: bob
+        })
+        const result = await _verifyDelegation({
+          delegation: carolZcap,
+          expectedRootCapability: capabilities.root.beta.id
+        })
+        _expectFailure(result, 'UnsupportedCaveatError')
+      })
+
+      it('should fail to verify an invocation of a zcap with a caveat', async () => {
+        const { invocation } = await _invokeAsCarol({
+          carolCaveat: [{ type: CAVEAT_TYPE }]
+        })
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read'
+        })
+        _expectFailure(result, 'UnsupportedCaveatError')
+      })
+
+      it('should fail to verify an invocation when a caveat is earlier in the chain', async () => {
+        const { invocation } = await _invokeAsCarol({
+          bobCaveat: [{ type: CAVEAT_TYPE }]
+        })
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read'
+        })
+        _expectFailure(result, 'UnsupportedCaveatError')
+      })
+
+      it('should report no caveats for a chain without any', async () => {
+        const { invocation } = await _invokeAsCarol({})
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read'
+        })
+        expect(result.verified).toBe(true)
+        expect(result.results[0].purposeResult.caveats).toEqual([])
+      })
+    })
+
+    describe('root zcap caveats', () => {
+      function _rootWithCaveat(caveat) {
+        const root = {
+          '@context': ZCAP_CONTEXT_URL,
+          id: uuid(),
+          controller: alice.id(),
+          invocationTarget: uuid(),
+          caveat
+        }
+        addToLoader({ doc: root })
+        return root
+      }
+
+      it('should fail to verify an invocation of a root zcap with a caveat', async () => {
+        const root = _rootWithCaveat({ type: CAVEAT_TYPE })
+        const invocation = await _invoke({
+          doc: clone(mock.exampleDoc),
+          invoker: alice,
+          capability: root,
+          capabilityAction: 'read'
+        })
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: root,
+          expectedAction: 'read'
+        })
+        const error = _expectFailure(result, 'UnsupportedCaveatError')
+        expect(error.message).toContain(root.id)
+      })
+
+      it('should fail to verify a delegation under a root zcap with a caveat', async () => {
+        const root = _rootWithCaveat([{ type: CAVEAT_TYPE }])
+        const bobZcap = await _delegate({
+          parentCapability: root,
+          controller: bob,
+          delegator: alice
+        })
+        const result = await _verifyDelegation({
+          delegation: bobZcap,
+          expectedRootCapability: root.id
+        })
+        _expectFailure(result, 'UnsupportedCaveatError')
+      })
+
+      it('should fail to verify with a malformed root zcap caveat', async () => {
+        const root = _rootWithCaveat(CAVEAT_TYPE)
+        const invocation = await _invoke({
+          doc: clone(mock.exampleDoc),
+          invoker: alice,
+          capability: root,
+          capabilityAction: 'read'
+        })
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: root,
+          expectedAction: 'read',
+          purposeOptions: {
+            supportedCaveats: new Map([
+              [CAVEAT_TYPE, async () => ({ valid: true })]
+            ])
+          }
+        })
+        _expectFailure(result, 'UnsupportedCaveatError')
+      })
+
+      it('should call the handler for a root zcap caveat first', async () => {
+        const root = _rootWithCaveat({ type: CAVEAT_TYPE })
+        const bobZcap = await _delegateWithCaveat({
+          parentCapability: root,
+          controller: bob,
+          delegator: alice,
+          caveat: { type: OTHER_CAVEAT_TYPE }
+        })
+        const invocation = await _invoke({
+          doc: clone(mock.exampleDoc),
+          invoker: bob,
+          capability: bobZcap,
+          capabilityAction: 'read'
+        })
+        const calls = []
+        const handler = async ({ caveat, capability }) => {
+          calls.push({ caveat, capability })
+          return { valid: true }
+        }
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: root,
+          expectedAction: 'read',
+          purposeOptions: {
+            supportedCaveats: new Map([
+              [CAVEAT_TYPE, handler],
+              [OTHER_CAVEAT_TYPE, handler]
+            ])
+          }
+        })
+        expect(result.verified).toBe(true)
+        const expected = [
+          { caveat: { type: CAVEAT_TYPE }, capability: root },
+          { caveat: { type: OTHER_CAVEAT_TYPE }, capability: bobZcap }
+        ]
+        expect(result.results[0].purposeResult.caveats).toEqual(expected)
+        expect(calls).toEqual(expected)
+      })
+    })
+
+    describe('malformed caveats', () => {
+      for (const [description, caveat] of [
+        ['a string', CAVEAT_TYPE],
+        ['an object without a type', { id: 'urn:example:caveat' }],
+        ['an object with an array type', { type: [CAVEAT_TYPE] }],
+        ['an array with a string entry', [{ type: CAVEAT_TYPE }, CAVEAT_TYPE]]
+      ] as const) {
+        it(`should fail to delegate with a caveat that is ${description}`, async () => {
+          await expect(
+            _delegateWithCaveat({
+              parentCapability: capabilities.root.beta,
+              controller: bob,
+              delegator: alice,
+              caveat
+            })
+          ).rejects.toMatchObject({ name: 'UnsupportedCaveatError' })
+        })
+      }
+
+      it('should fail to verify even with a handler registered', async () => {
+        let called = false
+        const bobZcap = await _delegateWithCaveat({
+          parentCapability: capabilities.root.beta,
+          controller: bob,
+          delegator: alice,
+          caveat: CAVEAT_TYPE,
+          purposeOptions: { _skipLocalValidationForTesting: true }
+        })
+        const result = await _verifyDelegation({
+          delegation: bobZcap,
+          expectedRootCapability: capabilities.root.beta.id,
+          purposeOptions: {
+            supportedCaveats: new Map([
+              [
+                CAVEAT_TYPE,
+                async () => {
+                  called = true
+                  return { valid: true }
+                }
+              ]
+            ])
+          }
+        })
+        _expectFailure(result, 'UnsupportedCaveatError')
+        expect(called).toBe(false)
+      })
+    })
+
+    describe('with "supportedCaveats"', () => {
+      it('should throw if "supportedCaveats" is not a Map', async () => {
+        expect(
+          () =>
+            new CapabilityDelegation({
+              expectedRootCapability: capabilities.root.beta.id,
+              suite: new Ed25519Signature2020(),
+              supportedCaveats: {} as any
+            })
+        ).toThrow('"supportedCaveats" must be a Map.')
+      })
+
+      it('should throw if a "supportedCaveats" handler is not a function', async () => {
+        expect(
+          () =>
+            new CapabilityDelegation({
+              expectedRootCapability: capabilities.root.beta.id,
+              suite: new Ed25519Signature2020(),
+              supportedCaveats: new Map([[CAVEAT_TYPE, true]]) as any
+            })
+        ).toThrow(
+          `The "supportedCaveats" handler for caveat type "${CAVEAT_TYPE}" ` +
+            'must be a function.'
+        )
+      })
+
+      it('should accept a "supportedCaveats" Map from another realm', async () => {
+        const supportedCaveats = runInNewContext('new Map()')
+        expect(supportedCaveats instanceof Map).toBe(false)
+        supportedCaveats.set(CAVEAT_TYPE, async () => ({ valid: true }))
+        const { invocation } = await _invokeAsCarol({
+          carolCaveat: { type: CAVEAT_TYPE }
+        })
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read',
+          purposeOptions: { supportedCaveats }
+        })
+        expect(result.verified).toBe(true)
+      })
+
+      it('should fail if the chain exceeds "maxCaveats"', async () => {
+        const { invocation } = await _invokeAsCarol({
+          bobCaveat: { type: CAVEAT_TYPE },
+          carolCaveat: [{ type: CAVEAT_TYPE }, { type: CAVEAT_TYPE }]
+        })
+        let called = false
+        const purposeOptions = {
+          supportedCaveats: new Map([
+            [
+              CAVEAT_TYPE,
+              async () => {
+                called = true
+                return { valid: true }
+              }
+            ]
+          ]),
+          maxCaveats: 2
+        }
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read',
+          purposeOptions
+        })
+        expect(result.verified).toBe(false)
+        const [error] = result.error.errors
+        expect(error.message).toBe(
+          'The capability chain exceeds the maximum allowed number of ' +
+            'caveats of 2.'
+        )
+        expect(called).toBe(false)
+
+        // the same chain verifies when the limit covers it
+        const allowed = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read',
+          purposeOptions: { ...purposeOptions, maxCaveats: 3 }
+        })
+        expect(allowed.verified).toBe(true)
+      })
+
+      it('should verify an invocation and list the caveats', async () => {
+        const { bobZcap, carolZcap, invocation } = await _invokeAsCarol({
+          bobCaveat: { type: CAVEAT_TYPE },
+          carolCaveat: [{ type: CAVEAT_TYPE }, { type: OTHER_CAVEAT_TYPE }]
+        })
+        const calls = []
+        const handler = async options => {
+          calls.push(options)
+          return { valid: true }
+        }
+        let inspected
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read',
+          inspectCapabilityChain: async details => {
+            inspected = details
+            return { valid: true }
+          },
+          purposeOptions: {
+            supportedCaveats: new Map([
+              [CAVEAT_TYPE, handler],
+              [OTHER_CAVEAT_TYPE, handler]
+            ])
+          }
+        })
+        expect(result.verified).toBe(true)
+        const expected = [
+          { caveat: { type: CAVEAT_TYPE }, capability: bobZcap },
+          { caveat: { type: CAVEAT_TYPE }, capability: carolZcap },
+          { caveat: { type: OTHER_CAVEAT_TYPE }, capability: carolZcap }
+        ]
+        const { purposeResult } = result.results[0]
+        expect(purposeResult.caveats).toEqual(expected)
+        expect(inspected.caveats).toEqual(expected)
+        expect(calls.length).toBe(3)
+        expect(
+          calls.map(({ caveat, capability }) => ({ caveat, capability }))
+        ).toEqual(expected)
+        for (const call of calls) {
+          expect(call.capabilityChain.map(({ id }) => id)).toEqual([
+            capabilities.root.beta.id,
+            bobZcap.id,
+            carolZcap.id
+          ])
+          // the handler is given the invocation it is deciding
+          expect(call.proofPurpose).toBe('capabilityInvocation')
+          expect(call.capabilityAction).toBe('read')
+          expect(call.invocationTarget).toBe(carolZcap.invocationTarget)
+          expect(call.proof.proofPurpose).toBe('capabilityInvocation')
+          expect(call.date).toBeInstanceOf(Date)
+        }
+      })
+
+      it('should verify a delegation and list the caveats', async () => {
+        const bobZcap = await _delegateWithCaveat({
+          parentCapability: capabilities.root.beta,
+          controller: bob,
+          delegator: alice,
+          caveat: [{ type: CAVEAT_TYPE }]
+        })
+        const calls = []
+        const date = new Date('2026-01-01T00:00:00Z')
+        const result = await _verifyDelegation({
+          delegation: bobZcap,
+          expectedRootCapability: capabilities.root.beta.id,
+          purposeOptions: {
+            date,
+            supportedCaveats: new Map([
+              [
+                CAVEAT_TYPE,
+                async options => {
+                  calls.push(options)
+                  return { valid: true }
+                }
+              ]
+            ])
+          }
+        })
+        expect(result.verified).toBe(true)
+        // a delegation proof carries no invocation details
+        expect(calls.length).toBe(1)
+        expect(calls[0].proofPurpose).toBe('capabilityDelegation')
+        expect(calls[0].proof.proofPurpose).toBe('capabilityDelegation')
+        expect(calls[0].capabilityAction).toBeUndefined()
+        expect(calls[0].invocationTarget).toBeUndefined()
+        expect(calls[0].date).toEqual(date)
+        // the tail is the document with its proof reattached, so compare IDs
+        const { caveats } = result.results[0].purposeResult
+        expect(caveats.length).toBe(1)
+        expect(caveats[0].caveat).toEqual({ type: CAVEAT_TYPE })
+        expect(caveats[0].capability.id).toBe(bobZcap.id)
+      })
+
+      it('should fail if any caveat has no handler, calling none', async () => {
+        const { invocation } = await _invokeAsCarol({
+          bobCaveat: { type: CAVEAT_TYPE },
+          carolCaveat: { type: OTHER_CAVEAT_TYPE }
+        })
+        let called = false
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read',
+          purposeOptions: {
+            supportedCaveats: new Map([
+              [
+                CAVEAT_TYPE,
+                async () => {
+                  called = true
+                  return { valid: true }
+                }
+              ]
+            ])
+          }
+        })
+        const error = _expectFailure(result, 'UnsupportedCaveatError')
+        expect(error.message).toContain(OTHER_CAVEAT_TYPE)
+        expect(called).toBe(false)
+      })
+
+      it('should not call a handler if "inspectCapabilityChain" rejects', async () => {
+        const { invocation } = await _invokeAsCarol({
+          carolCaveat: { type: CAVEAT_TYPE }
+        })
+        let called = false
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read',
+          inspectCapabilityChain: async ({ caveats }) => {
+            // the caveats are listed for the hook before any handler runs
+            expect(caveats.length).toBe(1)
+            expect(called).toBe(false)
+            return { valid: false, error: new Error('revoked') }
+          },
+          purposeOptions: {
+            supportedCaveats: new Map([
+              [
+                CAVEAT_TYPE,
+                async () => {
+                  called = true
+                  return { valid: true }
+                }
+              ]
+            ])
+          }
+        })
+        expect(result.verified).toBe(false)
+        const [error] = result.error.errors
+        expect(error.message).toBe('revoked')
+        expect(called).toBe(false)
+      })
+
+      it('should refuse an unsupported caveat before verifying the chain', async () => {
+        const bobZcap = await _delegateWithCaveat({
+          parentCapability: capabilities.root.beta,
+          controller: bob,
+          delegator: alice,
+          caveat: { type: CAVEAT_TYPE }
+        })
+        // break the delegation proof; the caveat is still reported first
+        bobZcap.invocationTarget = `${bobZcap.invocationTarget}/changed`
+        const invocation = await _invoke({
+          doc: clone(mock.exampleDoc),
+          invoker: bob,
+          capability: bobZcap,
+          capabilityAction: 'read'
+        })
+        const purposeOptions = {
+          expectedTarget: bobZcap.invocationTarget,
+          allowTargetAttenuation: true
+        }
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read',
+          purposeOptions
+        })
+        _expectFailure(result, 'UnsupportedCaveatError')
+
+        // with a handler, the broken proof is what fails the chain
+        let called = false
+        const supported = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read',
+          purposeOptions: {
+            ...purposeOptions,
+            supportedCaveats: new Map([
+              [
+                CAVEAT_TYPE,
+                async () => {
+                  called = true
+                  return { valid: true }
+                }
+              ]
+            ])
+          }
+        })
+        expect(supported.verified).toBe(false)
+        expect(supported.error.errors[0].name).not.toBe(
+          'UnsupportedCaveatError'
+        )
+        expect(called).toBe(false)
+      })
+
+      it('should fail if a handler answers "valid: false"', async () => {
+        const { invocation } = await _invokeAsCarol({
+          carolCaveat: { type: CAVEAT_TYPE }
+        })
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read',
+          purposeOptions: {
+            supportedCaveats: new Map([
+              [CAVEAT_TYPE, async () => ({ valid: false })]
+            ])
+          }
+        })
+        _expectFailure(result, 'CaveatNotSatisfiedError')
+      })
+
+      it('should fail with the error a handler supplies', async () => {
+        const { invocation } = await _invokeAsCarol({
+          carolCaveat: { type: CAVEAT_TYPE }
+        })
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read',
+          purposeOptions: {
+            supportedCaveats: new Map([
+              [
+                CAVEAT_TYPE,
+                async () => ({ valid: false, error: new RangeError('nope') })
+              ]
+            ])
+          }
+        })
+        const error = _expectFailure(result, 'RangeError')
+        expect(error.message).toBe('nope')
+      })
+
+      it('should fail if a handler throws', async () => {
+        const { invocation } = await _invokeAsCarol({
+          carolCaveat: { type: CAVEAT_TYPE }
+        })
+        const result = await _verifyInvocation({
+          invocation,
+          rootCapability: capabilities.root.beta,
+          expectedAction: 'read',
+          purposeOptions: {
+            supportedCaveats: new Map([
+              [
+                CAVEAT_TYPE,
+                async () => {
+                  throw new Error('handler failed')
+                }
+              ]
+            ])
+          }
+        })
+        expect(result.verified).toBe(false)
+        const [error] = result.error.errors
+        expect(error.message).toBe('handler failed')
+      })
+    })
   })
 })
 
