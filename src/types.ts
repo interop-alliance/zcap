@@ -105,6 +105,8 @@ export type CaveatHandler = (options: {
    * `capabilityInvocation` proof.
    */
   invocationTarget?: string
+  /** See `CapabilityValidateResult.dereferencedTarget`. */
+  dereferencedTarget?: string
   /** The date the chain is verified against (the `date` option, or now). */
   date: Date
 }) => Promise<InspectResult>
@@ -130,6 +132,8 @@ export interface CapabilityChainDetails {
   capabilityChainMeta: CapabilityMeta[]
   /** The caveats found in the chain (root to tail), all with a handler. */
   caveats: CapabilityCaveat[]
+  /** See `CapabilityValidateResult.dereferencedTarget`. */
+  dereferencedTarget?: string
 }
 
 /**
@@ -227,6 +231,11 @@ export interface CapabilityProofPurposeOptions extends CommonProofPurposeOptions
    * an LD proof.
    */
   term: string
+  /**
+   * Whether the derived class detected verify-proof mode from the params. When
+   * set, the base class validates and keeps the common verify params.
+   */
+  verifyMode?: boolean
 }
 
 /**
@@ -253,6 +262,17 @@ export interface CapabilityInvocationOptions extends CommonProofPurposeOptions {
   expectedAction?: string
   /** The target(s) a capability is expected to apply to (absolute URI(s)). */
   expectedTarget?: string | string[]
+  /**
+   * Maps the invoked capability's `invocationTarget` to the absolute URI that
+   * the proof's `invocationTarget` is compared against (for example, a DID URL
+   * target to the https URL it is served at). Consulted only when checking an
+   * invocation, not when verifying delegation links.
+   *
+   * Called for every invoked capability, after the chain and the invocation
+   * are verified, so it must return a target it does not map unchanged. The
+   * mapping must be deterministic and keep the path and query intact.
+   */
+  dereferenceTarget?: (options: { invocationTarget: string }) => Promise<string>
 }
 
 /**
@@ -309,6 +329,14 @@ export interface CapabilityValidateResult {
    * carrying it. Set once the chain is verified.
    */
   caveats?: CapabilityCaveat[]
+  /**
+   * The invoked capability's `invocationTarget` as mapped by the
+   * `dereferenceTarget` hook. Set only for a `capabilityInvocation` proof
+   * verified with that hook. It is in the same URI space as the proof's
+   * `invocationTarget`, while the capabilities in the chain keep their
+   * original targets.
+   */
+  dereferencedTarget?: string
   /** The invoker of the capability (for capability invocation proofs). */
   invoker?: object
   /** The delegator of the capability (for capability delegation proofs). */

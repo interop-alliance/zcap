@@ -97,6 +97,48 @@ const result = await jsigs.verify(invocation, {
 Match on the error `name`. An `instanceof` check fails when two copies of the
 package are loaded.
 
+#### Invoking a DID-targeted chain at an https URL
+
+A chain may carry targets such as `did:webvh:<scid>:alice.example/images/x.jpg`
+while the request is made to an https URL. Pass an async `dereferenceTarget`
+hook to `CapabilityInvocation` to map the invoked capability's target to the
+absolute URI that the proof's `invocationTarget` is compared against.
+
+```js
+const purpose = new CapabilityInvocation({
+  expectedAction: 'GET',
+  expectedTarget: 'https://alice.example/images/x.jpg',
+  expectedRootCapability: rootZcap.id,
+  suite: new Ed25519Signature2020(),
+  dereferenceTarget: async ({ invocationTarget }) =>
+    mapDidUrlToHttps(invocationTarget)
+})
+```
+
+The comparison rule is unchanged (equality, or a prefix when
+`allowTargetAttenuation` is set). The hook runs only for the invoked capability,
+not for delegation links. It must return an absolute URI string, or verification
+fails.
+
+The hook runs after the chain and the invocation are verified. It only sees the
+target of a capability with valid delegation proofs, invoked by its controller.
+
+The hook is called for every invocation once configured, including one whose
+chain is already in https space. It must return a target it does not map
+unchanged.
+
+The mapping must be deterministic, and it must keep the path and query of the
+target intact. Delegation links are compared in the chain's own URI space, and
+only the final comparison uses the mapped value. A mapping that drops the path
+would let a capability narrowed to one resource authorize the whole host when
+`allowTargetAttenuation` is set.
+
+The mapped value is passed to `inspectCapabilityChain` and to the caveat
+handlers as `dereferencedTarget`. It is also set on the purpose result. The
+capabilities in the chain keep their original targets, so a handler that
+compares paths should use `dereferencedTarget` together with the proof's
+`invocationTarget`.
+
 #### Registering caveat handlers
 
 To support a caveat type, pass a `supportedCaveats` map when verifying. The keys
@@ -145,13 +187,14 @@ no handler runs.
 
 Each handler also receives the proof being verified.
 
-| Option             | Value                                                           |
-| ------------------ | --------------------------------------------------------------- |
-| `proof`            | The invocation proof, or the tail zcap's delegation proof       |
-| `proofPurpose`     | `capabilityInvocation` or `capabilityDelegation`                |
-| `capabilityAction` | The invoked action (invocation proofs only)                     |
-| `invocationTarget` | The target named by the invocation proof (invocation only)      |
-| `date`             | The `Date` the chain is verified against (`date` option or now) |
+| Option               | Value                                                           |
+| -------------------- | --------------------------------------------------------------- |
+| `proof`              | The invocation proof, or the tail zcap's delegation proof       |
+| `proofPurpose`       | `capabilityInvocation` or `capabilityDelegation`                |
+| `capabilityAction`   | The invoked action (invocation proofs only)                     |
+| `invocationTarget`   | The target named by the invocation proof (invocation only)      |
+| `dereferencedTarget` | The invoked zcap's target as mapped by `dereferenceTarget`      |
+| `date`               | The `Date` the chain is verified against (`date` option or now) |
 
 A handler runs whenever the chain is verified, for a delegation as well as an
 invocation. Check `proofPurpose` if the caveat only applies to invocations.

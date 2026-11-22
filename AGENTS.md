@@ -155,6 +155,13 @@ passed to `inspectCapabilityChain`.
 verification and the `inspectCapabilityChain` hook. Calls each handler with the
 caveat, its zcap, the chain and the proof being verified.
 
+**`dereferenceTarget`** hook (`CapabilityInvocation.ts`): Optional, verify mode
+only. Maps the invoked capability's `invocationTarget` (for example a DID URL)
+to the URI space of the proof's `invocationTarget`. It runs in
+`_runChecksAfterChainVerification`, so it only sees a verified chain. The result
+is passed to `inspectCapabilityChain` and the caveat handlers as
+`dereferencedTarget`, and set on the purpose result.
+
 **`inspectCapabilityChain`** hook: After chain verification succeeds (and before
 the caveat handlers), calls a user-supplied async function with the full
 `{capabilityChain, capabilityChainMeta}` — the intended extension point for

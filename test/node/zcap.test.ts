@@ -2,7 +2,7 @@
  * Copyright (c) 2018-2024 Digital Bazaar, Inc. All rights reserved.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { runInNewContext } from 'node:vm'
 import jsigs from '@interop/jsonld-signatures'
 import { Ed25519Signature2020 } from '@interop/ed25519-signature'
@@ -5250,6 +5250,248 @@ describe('zcap', () => {
         }
       )
     }) // end Path-based hierarchical attenuation
+  })
+  describe('dereferenceTarget', () => {
+    // a chain that lives in DID URL space, invoked at an https URL
+    async function _setup({ attenuate = false } = {}) {
+      const didTarget = `did:webvh:${uuid().slice(9)}:alice.example/images/x.jpg`
+      const httpsTarget = 'https://alice.example/images/x.jpg'
+      const rootCapability = createRootCapability({
+        controller: alice.id(),
+        invocationTarget: attenuate
+          ? didTarget.replace('/x.jpg', '')
+          : didTarget
+      })
+      addToLoader({ doc: rootCapability })
+      const bobZcap = await _delegate({
+        parentCapability: rootCapability,
+        controller: bob,
+        delegator: alice
+      })
+      const carolZcap = await _delegate({
+        newCapability: {
+          '@context': ZCAP_CONTEXT_URL,
+          id: uuid(),
+          controller: carol.id(),
+          parentCapability: bobZcap.id,
+          invocationTarget: didTarget,
+          expires: EXPIRES_3000_DATE
+        },
+        parentCapability: bobZcap,
+        delegator: bob
+      })
+      return { didTarget, httpsTarget, rootCapability, carolZcap }
+    }
+
+    // invokes `capability` at `target` as `invoker`, then verifies with the
+    // expected action, target and root plus any extra purpose options
+    async function _verifyAt({
+      setup,
+      target = setup.httpsTarget,
+      capability = setup.carolZcap,
+      invoker = carol,
+      ...purposeOptions
+    }) {
+      return _verifyInvocation({
+        invocation: await _invoke({
+          doc: clone(mock.exampleDoc),
+          invoker,
+          purposeOptions: {
+            capability,
+            capabilityAction: 'read',
+            invocationTarget: target
+          }
+        }),
+        purposeOptions: {
+          expectedAction: 'read',
+          expectedTarget: target,
+          expectedRootCapability: setup.rootCapability.id,
+          ...purposeOptions
+        }
+      })
+    }
+
+    // maps the did target to its https counterpart
+    const _toHttps = async ({ invocationTarget }) =>
+      invocationTarget.replace(/^did:webvh:[^:]+:/, 'https://')
+
+    it('should verify an exact match after dereferencing', async () => {
+      const setup = await _setup()
+      const result = await _verifyAt({ setup, dereferenceTarget: _toHttps })
+      expect(result.verified).toBe(true)
+    })
+
+    it('should fail without dereferenceTarget', async () => {
+      const setup = await _setup()
+      const result = await _verifyAt({ setup })
+      expect(result.verified).toBe(false)
+      expect(result.error.errors[0].message).toContain(
+        'does not match capability target'
+      )
+    })
+
+    it('should verify a target beneath the dereferenced one', async () => {
+      const setup = await _setup()
+      const result = await _verifyAt({
+        setup,
+        target: `${setup.httpsTarget}/sub`,
+        allowTargetAttenuation: true,
+        dereferenceTarget: _toHttps
+      })
+      expect(result.verified).toBe(true)
+    })
+
+    it('should fail a target outside the dereferenced one', async () => {
+      const setup = await _setup()
+      const result = await _verifyAt({
+        setup,
+        target: `${setup.httpsTarget}.other`,
+        allowTargetAttenuation: true,
+        dereferenceTarget: _toHttps
+      })
+      expect(result.verified).toBe(false)
+      expect(result.error.errors[0].message).toContain(
+        'does not match capability target'
+      )
+    })
+
+    it('should fail when the hook returns a non-absolute value', async () => {
+      const setup = await _setup()
+      const result = await _verifyAt({
+        setup,
+        dereferenceTarget: async () => '/x.jpg'
+      })
+      expect(result.verified).toBe(false)
+      const [error] = result.error.errors
+      expect(error.name).toBe('TypeError')
+      expect(error.message).toContain('absolute URI')
+    })
+
+    it('should fail when the hook throws', async () => {
+      const setup = await _setup()
+      const result = await _verifyAt({
+        setup,
+        dereferenceTarget: async () => {
+          throw new Error('cannot dereference')
+        }
+      })
+      expect(result.verified).toBe(false)
+      expect(result.error.errors[0].message).toContain('cannot dereference')
+    })
+
+    it('should call the hook with the tail capability target', async () => {
+      const setup = await _setup({ attenuate: true })
+      const dereferenceTarget = vi.fn(_toHttps)
+      const result = await _verifyAt({
+        setup,
+        allowTargetAttenuation: true,
+        dereferenceTarget
+      })
+      expect(result.verified).toBe(true)
+      expect(dereferenceTarget.mock.calls).toEqual([
+        [{ invocationTarget: setup.didTarget }]
+      ])
+    })
+
+    it('should report the dereferenced target on a mismatch', async () => {
+      const setup = await _setup()
+      const result = await _verifyAt({
+        setup,
+        dereferenceTarget: async () => 'https://alice.example/image/x.jpg'
+      })
+      expect(result.verified).toBe(false)
+      expect(result.error.errors[0].message).toBe(
+        `Invocation target (${setup.httpsTarget}) does not match capability ` +
+          `target (${setup.didTarget}) dereferenced to ` +
+          '(https://alice.example/image/x.jpg).'
+      )
+    })
+
+    it('should not call the hook for a forged delegation', async () => {
+      const setup = await _setup()
+      // changing a signed property invalidates the delegation proof
+      const forged = clone(setup.carolZcap)
+      forged.invocationTarget = forged.invocationTarget.replace(
+        'alice.example',
+        'attacker.example'
+      )
+      const dereferenceTarget = vi.fn(_toHttps)
+      const result = await _verifyAt({
+        setup,
+        capability: forged,
+        allowTargetAttenuation: true,
+        dereferenceTarget
+      })
+      expect(result.verified).toBe(false)
+      expect(dereferenceTarget).not.toHaveBeenCalled()
+    })
+
+    it('should not call the hook for the wrong invoker', async () => {
+      const setup = await _setup()
+      const dereferenceTarget = vi.fn(_toHttps)
+      const result = await _verifyAt({
+        setup,
+        invoker: bob,
+        dereferenceTarget
+      })
+      expect(result.verified).toBe(false)
+      expect(dereferenceTarget).not.toHaveBeenCalled()
+    })
+
+    it('should call the hook without a receiver', async () => {
+      const setup = await _setup()
+      let hasReceiver = true
+      const result = await _verifyAt({
+        setup,
+        async dereferenceTarget({ invocationTarget }) {
+          hasReceiver = this !== undefined
+          return _toHttps({ invocationTarget })
+        }
+      })
+      expect(result.verified).toBe(true)
+      expect(hasReceiver).toBe(false)
+    })
+
+    it('should pass the dereferenced target on', async () => {
+      const setup = await _setup()
+      const inspectCapabilityChain = vi.fn(async () => ({ valid: true }))
+      const result = await _verifyAt({
+        setup,
+        dereferenceTarget: _toHttps,
+        inspectCapabilityChain
+      })
+      expect(result.verified).toBe(true)
+      expect(inspectCapabilityChain.mock.calls[0][0].dereferencedTarget).toBe(
+        setup.httpsTarget
+      )
+      expect(result.results[0].purposeResult.dereferencedTarget).toBe(
+        setup.httpsTarget
+      )
+    })
+
+    it('should throw without expectedRootCapability', () => {
+      expect(
+        () =>
+          new CapabilityInvocation({
+            dereferenceTarget: _toHttps,
+            expectedAction: 'read',
+            expectedTarget: 'https://example.com/x'
+          })
+      ).toThrow('"expectedRootCapability" must be a string or array.')
+    })
+
+    it('should throw when dereferenceTarget is not a function', () => {
+      expect(
+        () =>
+          new CapabilityInvocation({
+            dereferenceTarget: 'nope',
+            expectedAction: 'read',
+            expectedTarget: 'https://example.com/x',
+            expectedRootCapability: 'urn:zcap:root:x',
+            suite: new Ed25519Signature2020()
+          })
+      ).toThrow('"dereferenceTarget" must be a function')
+    })
   })
   describe('Caveats', () => {
     const CAVEAT_TYPE = 'urn:example:caveat:OwnResourcesOnly'

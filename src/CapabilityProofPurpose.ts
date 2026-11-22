@@ -89,6 +89,8 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
    *   handler fails verification.
    * @param options.term - The term `capabilityInvocation` or
    *   `capabilityDelegation` to look for in an LD proof.
+   * @param options.verifyMode - Whether the derived class detected
+   *   verify-proof mode from the params.
    */
   constructor(
     {
@@ -106,20 +108,15 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
       maxClockSkew = 300,
       suite,
       supportedCaveats,
-      term
+      term,
+      verifyMode = false
     }: CapabilityProofPurposeOptions = {} as CapabilityProofPurposeOptions
   ) {
     super({ term, controller, date, maxTimestampDelta })
 
-    // params used to verify a proof
-    const hasVerifyProofParams =
-      controller ||
-      date ||
-      expectedRootCapability ||
-      inspectCapabilityChain ||
-      suite ||
-      supportedCaveats
-    if (hasVerifyProofParams) {
+    // the derived class detects verify-proof mode, as it has verify params of
+    // its own
+    if (verifyMode) {
       if (!(
         typeof expectedRootCapability === 'string' ||
         Array.isArray(expectedRootCapability)
@@ -339,6 +336,9 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
         validateOptions
       })
 
+      // set only by an invocation check with a `dereferenceTarget` hook
+      const { dereferencedTarget } = validateResult
+
       // 5. Run `inspectCapabilityChain` hook.
       const { inspectCapabilityChain } = this
       if (inspectCapabilityChain) {
@@ -347,7 +347,8 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
           capabilityChain: dereferencedChain,
           // capability chain meta including `null` for root zcap
           capabilityChainMeta: [{ verifyResult: null }, ...capabilityChainMeta],
-          caveats
+          caveats,
+          dereferencedTarget
         })
         if (!valid) {
           throw error
@@ -357,7 +358,12 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
       /* 6. Call the caveat handlers. This runs only after the whole chain is
       verified and inspected, so handlers never see an unverified or revoked
       capability. */
-      await this._runCaveatHandlers({ caveats, dereferencedChain, proof })
+      await this._runCaveatHandlers({
+        caveats,
+        dereferencedChain,
+        dereferencedTarget,
+        proof
+      })
 
       // include dereferenced chain and caveats in result
       validateResult.dereferencedChain = dereferencedChain
@@ -477,6 +483,8 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
    * @param options.caveats - The caveats from `_resolveCaveats`, each with a
    *   handler in `supportedCaveats`.
    * @param options.dereferencedChain - The verified chain (root to tail).
+   * @param options.dereferencedTarget - The invoked capability's target as
+   *   mapped by the `dereferenceTarget` hook, passed to each handler.
    * @param options.proof - The proof being validated, passed to each handler.
    *
    * @throws {CaveatNotSatisfiedError} If a handler answers `valid: false`
@@ -485,10 +493,12 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
   async _runCaveatHandlers({
     caveats,
     dereferencedChain,
+    dereferencedTarget,
     proof
   }: {
     caveats: CapabilityCaveat[]
     dereferencedChain: IZcap[]
+    dereferencedTarget?: string
     proof: IProofDescription
   }): Promise<void> {
     const { date, supportedCaveats } = this
@@ -506,6 +516,7 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
         // only an invocation proof carries these
         capabilityAction: proof.capabilityAction as string | undefined,
         invocationTarget: proof.invocationTarget as string | undefined,
+        dereferencedTarget,
         date: currentDate
       })
       if (!valid) {

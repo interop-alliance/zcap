@@ -132,7 +132,8 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
       maxTimestampDelta: Infinity,
       suite,
       supportedCaveats,
-      term: 'capabilityDelegation'
+      term: 'capabilityDelegation',
+      verifyMode: Boolean(hasVerifyProofParams)
     })
 
     // validate `CapabilityDelegation` specific params, the base class will

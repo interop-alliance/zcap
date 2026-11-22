@@ -1,5 +1,21 @@
 # @interop/zcap ChangeLog
 
+## 12.1.0 - TBD
+
+### Added
+
+- Add optional async `dereferenceTarget` hook to `CapabilityInvocation`. It maps
+  the invoked capability's `invocationTarget` before the proof target
+  comparison. A chain in DID URL space can then be invoked at an https URL.
+- The mapped target is passed to `inspectCapabilityChain` and the caveat
+  handlers as `dereferencedTarget`. It is also set on the purpose result.
+
+### Fixed
+
+- A verify-mode constructor call without `expectedRootCapability` throws a
+  `TypeError`, whichever verify option signals the mode. Previously some
+  combinations constructed a purpose that could never verify.
+
 ## 12.0.0 - 2026-11-17
 
 ### Changed

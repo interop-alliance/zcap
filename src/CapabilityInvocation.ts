@@ -36,6 +36,7 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
   invocationTarget?: string
   expectedAction?: string
   expectedTarget?: string | string[]
+  dereferenceTarget?: CapabilityInvocationOptions['dereferenceTarget']
 
   /**
    * @param options - The options.
@@ -56,6 +57,14 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
    *   for the creation of the proof (within a maximum timestamp delta) and for
    *   checking to see if a capability has expired; if not passed the current
    *   date will be used.
+   * @param options.dereferenceTarget - An optional async function that maps
+   *   the invoked capability's `invocationTarget` to an absolute URI string,
+   *   which is then compared against the proof's `invocationTarget` (exactly,
+   *   or under `allowTargetAttenuation`). Used when the capability chain
+   *   targets a non-HTTP URI such as a DID URL while the request is made to an
+   *   https URL. Called only for the invoked (tail) capability, after the
+   *   chain and the invocation are verified. The result is passed on to
+   *   `inspectCapabilityChain` and the caveat handlers as `dereferencedTarget`.
    * @param options.expectedAction - The capability action that is expected when
    *   validating a proof.
    * @param options.expectedRootCapability - The expected root capability for
@@ -98,6 +107,7 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     allowedContexts,
     controller,
     date,
+    dereferenceTarget,
     expectedAction,
     expectedRootCapability,
     expectedTarget,
@@ -117,6 +127,7 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     const hasVerifyProofParams =
       controller ||
       date ||
+      dereferenceTarget ||
       expectedAction ||
       expectedRootCapability ||
       expectedTarget ||
@@ -146,7 +157,8 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
       maxTimestampDelta,
       suite,
       supportedCaveats,
-      term: 'capabilityInvocation'
+      term: 'capabilityInvocation',
+      verifyMode: Boolean(hasVerifyProofParams)
     })
 
     // validate `CapabilityInvocation` specific params, the base class will
@@ -199,8 +211,16 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
         }
       }
 
+      if (
+        dereferenceTarget !== undefined &&
+        typeof dereferenceTarget !== 'function'
+      ) {
+        throw new TypeError('"dereferenceTarget" must be a function.')
+      }
+
       this.expectedTarget = expectedTarget
       this.expectedAction = expectedAction
+      this.dereferenceTarget = dereferenceTarget
     }
   }
 
@@ -298,7 +318,9 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
    * `capabilityAction` is allowed and matches `expectedAction`, that the
    * proof's `invocationTarget` matches the capability target (honoring target
    * attenuation) and an `expectedTarget`, and that a delegated capability is
-   * not invoked before its delegation proof's `created` date.
+   * not invoked before its delegation proof's `created` date. With a
+   * `dereferenceTarget` hook, the capability target comparison is left to
+   * `_runChecksAfterChainVerification`.
    *
    * @param options - The options.
    * @param options.dereferencedChain - The dereferenced chain (root to tail).
@@ -315,7 +337,7 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     proof: IProofDescription
     validateOptions: ValidateOptions
   }): Promise<{ capabilityChainMeta: CapabilityMeta[] }> {
-    const { allowTargetAttenuation, expectedAction, expectedTarget } = this
+    const { dereferenceTarget, expectedAction, expectedTarget } = this
 
     /* 1. Ensure that `capabilityAction` is an allowed action and that
     it matches `expectedAction`. Note that if it doesn't match and `match`
@@ -351,8 +373,11 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     /* 3. Verify the invocation target in the proof is as expected. The
     `invocationTarget` specified in the capability invocation proof must
     match exactly (or follow acceptable target attenuation rules) the
-    `invocationTarget` specified in the invoked capability. */
-    const capabilityTarget = utils.getTarget({ capability })
+    `invocationTarget` specified in the invoked capability.
+
+    A `dereferenceTarget` hook may do network work, and at this point the
+    capability target is still unverified input. With a hook, this comparison
+    runs in `_runChecksAfterChainVerification` instead. */
     const { invocationTarget } = proof
     if (!utils.isAbsoluteUri(invocationTarget)) {
       throw new TypeError(
@@ -360,17 +385,8 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
           'expresses an absolute URI.'
       )
     }
-    if (
-      !utils.isValidTarget({
-        invocationTarget,
-        baseInvocationTarget: capabilityTarget,
-        allowTargetAttenuation
-      })
-    ) {
-      throw new Error(
-        `Invocation target (${invocationTarget}) does not match ` +
-          `capability target (${capabilityTarget}).`
-      )
+    if (!dereferenceTarget) {
+      this._checkInvocationTarget({ capability, proof })
     }
 
     /* 4. Verify the invocation target is an expected target. Prior to this
@@ -416,10 +432,54 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
   }
 
   /**
+   * Checks that the proof's `invocationTarget` matches the invoked capability's
+   * target, exactly or under `allowTargetAttenuation`.
+   *
+   * @param options - The options.
+   * @param options.capability - The invoked (tail) capability.
+   * @param options.dereferencedTarget - The capability target as mapped by the
+   *   `dereferenceTarget` hook, compared in place of the capability target.
+   * @param options.proof - The capability invocation proof.
+   *
+   * @throws {Error} If the targets do not match.
+   */
+  _checkInvocationTarget({
+    capability,
+    dereferencedTarget,
+    proof
+  }: {
+    capability: IZcap
+    dereferencedTarget?: string
+    proof: IProofDescription
+  }): void {
+    const { allowTargetAttenuation } = this
+    const capabilityTarget = utils.getTarget({ capability })
+    const invocationTarget = proof.invocationTarget as string
+    if (
+      !utils.isValidTarget({
+        invocationTarget,
+        baseInvocationTarget: dereferencedTarget ?? capabilityTarget,
+        allowTargetAttenuation
+      })
+    ) {
+      const dereferencedTo =
+        dereferencedTarget === undefined
+          ? ''
+          : ` dereferenced to (${dereferencedTarget})`
+      throw new Error(
+        `Invocation target (${invocationTarget}) does not match ` +
+          `capability target (${capabilityTarget})${dereferencedTo}.`
+      )
+    }
+  }
+
+  /**
    * Runs invocation-specific checks after chain verification: that the invoking
    * verification method (or its controller) is the capability controller, that
    * a delegated capability has not expired, and the base proof validation. Sets
-   * `result.invoker` to the proof controller.
+   * `result.invoker` to the proof controller. With a `dereferenceTarget` hook,
+   * it then calls the hook and compares the proof's `invocationTarget` against
+   * the dereferenced capability target, set as `result.dereferencedTarget`.
    *
    * @param options - The options.
    * @param options.dereferencedChain - The dereferenced chain (root to tail).
@@ -491,6 +551,24 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     // the controller of the verification method from the proof is the
     // invoker of the capability
     result.invoker = result.controller
+
+    /* Dereference the capability target and compare the proof's invocation
+    target against it. This runs last so the hook only ever sees the target of
+    a verified, unexpired capability invoked by its controller. */
+    const { dereferenceTarget } = this
+    if (dereferenceTarget) {
+      const dereferencedTarget = await dereferenceTarget({
+        invocationTarget: utils.getTarget({ capability })
+      })
+      if (!utils.isAbsoluteUri(dereferencedTarget)) {
+        throw new TypeError(
+          `Dereferenced capability target (${dereferencedTarget}) must ` +
+            'be a string that expresses an absolute URI.'
+        )
+      }
+      this._checkInvocationTarget({ capability, dereferencedTarget, proof })
+      result.dereferencedTarget = dereferencedTarget
+    }
 
     return result
   }
