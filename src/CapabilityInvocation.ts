@@ -63,7 +63,9 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
    *   or under `allowTargetAttenuation`). Used when the capability chain
    *   targets a non-HTTP URI such as a DID URL while the request is made to an
    *   https URL. Called only for the invoked (tail) capability, after the
-   *   chain and the invocation are verified. The result is passed on to
+   *   chain and the invocation are verified. For a `did:` capability target the
+   *   result must consume the DID URL's selectors: one with a query or
+   *   fragment is refused. The result is passed on to
    *   `inspectCapabilityChain` and the caveat handlers as `dereferencedTarget`.
    * @param options.expectedAction - The capability action that is expected when
    *   validating a proof.
@@ -455,19 +457,13 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     const { allowTargetAttenuation } = this
     const capabilityTarget = utils.getTarget({ capability })
     const invocationTarget = proof.invocationTarget as string
-    // a DID URL target keeps its path and selector rule after dereferencing
-    const valid =
-      dereferencedTarget !== undefined && capabilityTarget.startsWith('did:')
-        ? utils.isValidDereferencedDidUrlTarget({
-            invocationTarget,
-            dereferencedTarget,
-            allowTargetAttenuation
-          })
-        : utils.isValidTarget({
-            invocationTarget,
-            baseInvocationTarget: dereferencedTarget ?? capabilityTarget,
-            allowTargetAttenuation
-          })
+    // the hook consumes a DID URL's selectors, so the dereferenced target is
+    // compared as a capability target of its own form would be
+    const valid = utils.isValidTarget({
+      invocationTarget,
+      baseInvocationTarget: dereferencedTarget ?? capabilityTarget,
+      allowTargetAttenuation
+    })
     if (!valid) {
       const dereferencedTo =
         dereferencedTarget === undefined
@@ -564,13 +560,24 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     a verified, unexpired capability invoked by its controller. */
     const { dereferenceTarget } = this
     if (dereferenceTarget) {
+      const capabilityTarget = utils.getTarget({ capability })
       const dereferencedTarget = await dereferenceTarget({
-        invocationTarget: utils.getTarget({ capability })
+        invocationTarget: capabilityTarget
       })
       if (!utils.isAbsoluteUri(dereferencedTarget)) {
         throw new TypeError(
           `Dereferenced capability target (${dereferencedTarget}) must ` +
             'be a string that expresses an absolute URI.'
+        )
+      }
+      // dereferencing a DID URL consumes its selectors
+      if (
+        capabilityTarget.startsWith('did:') &&
+        /[?#]/.test(dereferencedTarget)
+      ) {
+        throw new TypeError(
+          `Dereferenced capability target (${dereferencedTarget}) must ` +
+            "consume the DID URL's selectors and have no query or fragment."
         )
       }
       this._checkInvocationTarget({ capability, dereferencedTarget, proof })

@@ -5560,49 +5560,202 @@ describe('zcap', () => {
       )
     })
 
-    it('should keep the selector rule after dereferencing', async () => {
-      const didTarget = `did:webvh:${uuid().slice(9)}:alice.example/photos?versionId=3`
-      const httpsTarget = 'https://alice.example/photos?versionId=3'
-      const rootCapability = createRootCapability({
-        controller: alice.id(),
-        invocationTarget: didTarget
-      })
-      addToLoader({ doc: rootCapability })
-      const carolZcap = await _delegate({
-        parentCapability: rootCapability,
-        controller: carol,
-        delegator: alice
-      })
-      const setup = { didTarget, httpsTarget, rootCapability, carolZcap }
-      const options = {
-        setup,
-        allowTargetAttenuation: true,
-        dereferenceTarget: _toHttps
+    describe('DID URL target with selectors', () => {
+      const base = 'https://alice.example/photos/'
+      // A real dereference consumes the selectors. The DID URL
+      // `...:alice.example/photos/?versionId=3` dereferences to the plain
+      // https URL, which carries no query.
+      const _consumeSelectors = async ({ invocationTarget }) =>
+        invocationTarget
+          .replace(/^did:webvh:[^:]+:/, 'https://')
+          .replace(/[?#].*$/, '')
+      // asserts the invocation fails on the target comparison itself
+      function _expectTargetMismatch(result) {
+        expect(result.verified).toBe(false)
+        expect(result.error.errors[0].message).toContain(
+          'does not match capability target'
+        )
+      }
+      async function _selectorSetup({ didTarget }: { didTarget: string }) {
+        const rootCapability = createRootCapability({
+          controller: alice.id(),
+          invocationTarget: didTarget
+        })
+        addToLoader({ doc: rootCapability })
+        const carolZcap = await _delegate({
+          parentCapability: rootCapability,
+          controller: carol,
+          delegator: alice
+        })
+        return { didTarget, httpsTarget: base, rootCapability, carolZcap }
       }
 
-      // path narrowing with the same selector
-      const narrowed = await _verifyAt({
-        ...options,
-        target: 'https://alice.example/photos/2024?versionId=3'
-      })
-      expect(narrowed.verified).toBe(true)
+      for (const selector of ['', '?versionId=3']) {
+        const label = selector ? 'with versionId' : 'without selector'
+        const _setupFor = () =>
+          _selectorSetup({
+            didTarget: `did:webvh:${uuid().slice(9)}:alice.example/photos/${selector}`
+          })
 
-      // the selector may not be extended
-      const extended = await _verifyAt({
-        ...options,
-        target: `${httpsTarget}&versionId=4`
-      })
-      expect(extended.verified).toBe(false)
-      expect(extended.error.errors[0].message).toContain(
-        'does not match capability target'
-      )
+        it(`should apply the https rule to the dereferenced URL (${label})`, async () => {
+          const setup = await _setupFor()
+          const options = {
+            setup,
+            allowTargetAttenuation: true,
+            dereferenceTarget: _consumeSelectors
+          }
+          const verify = async (target: string) =>
+            (await _verifyAt({ ...options, target })).verified
 
-      // a dot segment is not a narrowing
-      const dotted = await _verifyAt({
-        ...options,
-        target: 'https://alice.example/photos/../private?versionId=3'
+          // (a) exact
+          expect(await verify(base)).toBe(true)
+          // (b) path beneath
+          expect(await verify(`${base}2024`)).toBe(true)
+          // (c) added query
+          expect(await verify(`${base}?page=2`)).toBe(true)
+          // (d) path beneath plus query
+          expect(await verify(`${base}2024?page=2`)).toBe(true)
+          // (e) sibling, (f) dot segment
+          for (const target of [
+            'https://alice.example/photos-evil/',
+            `${base}../private`,
+            `${base}%2e%2e/private`,
+            `${base}..%2fprivate`,
+            `${base}..%5Cprivate`,
+            `${base}..\\private`
+          ]) {
+            _expectTargetMismatch(await _verifyAt({ ...options, target }))
+          }
+          if (selector) {
+            // the pin chose the document version that produced the https URL;
+            // a query on the https request is an ordinary https query
+            expect(await verify(`${base}?versionId=4`)).toBe(true)
+            expect(await verify(`${base}2024?versionId=9`)).toBe(true)
+          }
+        })
+
+        it(`should require the exact URL without attenuation (${label})`, async () => {
+          const setup = await _setupFor()
+          const options = { setup, dereferenceTarget: _consumeSelectors }
+          expect((await _verifyAt(options)).verified).toBe(true)
+          for (const target of [
+            `${base}?page=2`,
+            `${base}2024`,
+            `${base}2024?page=2`,
+            `${base}?versionId=4`,
+            `${base}2024?versionId=9`
+          ]) {
+            _expectTargetMismatch(await _verifyAt({ ...options, target }))
+          }
+        })
+      }
+
+      // a DID URL hook result must have no query or fragment
+      for (const kind of ['delegated', 'root']) {
+        for (const suffix of ['?kind=jpg', '#frag']) {
+          for (const allowTargetAttenuation of [true, false]) {
+            it(`should refuse a ${kind} DID URL hook result ending in ${suffix} (attenuation ${allowTargetAttenuation})`, async () => {
+              const setup = await _selectorSetup({
+                didTarget: `did:webvh:${uuid().slice(9)}:alice.example/photos/`
+              })
+              const isRoot = kind === 'root'
+              const common = {
+                setup,
+                allowTargetAttenuation,
+                dereferenceTarget: async () => `${base}${suffix}`,
+                ...(isRoot
+                  ? { capability: setup.rootCapability.id, invoker: alice }
+                  : {})
+              }
+              for (const target of [
+                `${base}${suffix}`,
+                `${base}${suffix}&page=2`,
+                `${base}2024${suffix}`
+              ]) {
+                const result = await _verifyAt({ ...common, target })
+                expect(result.verified).toBe(false)
+                const [error] = result.error.errors
+                expect(error.name).toBe('TypeError')
+                expect(error.message).toContain('consume the DID URL')
+              }
+            })
+          }
+        }
+      }
+
+      it('should refuse a query-keeping hook with a duplicate selector parameter', async () => {
+        const setup = await _selectorSetup({
+          didTarget: `did:webvh:${uuid().slice(9)}:alice.example/photos?versionId=3`
+        })
+        const result = await _verifyAt({
+          setup,
+          target: 'https://alice.example/photos?versionId=3&versionId=4',
+          allowTargetAttenuation: true,
+          dereferenceTarget: async ({ invocationTarget }) =>
+            invocationTarget.replace(/^did:webvh:[^:]+:/, 'https://')
+        })
+        expect(result.verified).toBe(false)
+        expect(result.error.errors[0].message).toContain('consume the DID URL')
       })
-      expect(dotted.verified).toBe(false)
+
+      // This is not the DID selector case. The capability target is https, so
+      // a hook result with a query gets the https query rule.
+      it('should apply the https query rule to a non-DID target with a query', async () => {
+        const target = `https://alice.example/photos/${uuid()}/?kind=jpg`
+        const rootCapability = createRootCapability({
+          controller: alice.id(),
+          invocationTarget: target
+        })
+        addToLoader({ doc: rootCapability })
+        const options = {
+          setup: {
+            didTarget: target,
+            httpsTarget: target,
+            rootCapability,
+            carolZcap: rootCapability
+          },
+          capability: rootCapability.id,
+          invoker: alice,
+          allowTargetAttenuation: true,
+          dereferenceTarget: async ({ invocationTarget }) => invocationTarget
+        }
+        const verify = async (invoked: string) =>
+          (await _verifyAt({ ...options, target: invoked })).verified
+        expect(await verify(target)).toBe(true)
+        expect(await verify(`${target}&page=2`)).toBe(true)
+        for (const invoked of [
+          target.replace('/?', '/2024?'),
+          target.replace('?kind=jpg', '?page=2')
+        ]) {
+          _expectTargetMismatch(
+            await _verifyAt({ ...options, target: invoked })
+          )
+        }
+      })
+
+      it('should invoke a root DID URL capability with an added query', async () => {
+        const didTarget = `did:webvh:${uuid().slice(9)}:alice.example/photos/`
+        const rootCapability = createRootCapability({
+          controller: alice.id(),
+          invocationTarget: didTarget
+        })
+        addToLoader({ doc: rootCapability })
+        const target = 'https://alice.example/photos/?page=2'
+        const result = await _verifyAt({
+          setup: {
+            didTarget,
+            httpsTarget: target,
+            rootCapability,
+            carolZcap: rootCapability
+          },
+          capability: rootCapability.id,
+          invoker: alice,
+          target,
+          allowTargetAttenuation: true,
+          dereferenceTarget: _toHttps
+        })
+        expect(result.verified).toBe(true)
+      })
     })
 
     it('should fail when the hook returns a non-absolute value', async () => {

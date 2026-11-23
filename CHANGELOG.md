@@ -1,5 +1,26 @@
 # @interop/zcap ChangeLog
 
+## 12.3.0 - TBD
+
+### Changed
+
+- When a `dereferenceTarget` hook maps a DID URL capability target, the
+  dereferenced target is compared with the proof target as a target of its own
+  form would be. An https result now allows a path beneath it or an added query
+  under `allowTargetAttenuation`, so a DID URL grant works on query-bearing
+  requests.
+- A `dereferenceTarget` result for a `did:` capability target must have no query
+  or fragment, since the hook consumes the DID URL's selectors. A result with
+  one is refused. This reverses the 12.2.0 behavior, where the DID URL path and
+  selector rule was applied to the hook result. A hook that keeps the query no
+  longer verifies.
+- The dot segment check on a narrowed target now treats `\`, `%2f` and `%5c` as
+  segment boundaries, so a target such as `photos/..%2fprivate` is refused.
+
+### Removed
+
+- `isValidDereferencedDidUrlTarget` (internal, never exported from the index).
+
 ## 12.2.0 - 2026-11-22
 
 ### Changed

@@ -62,10 +62,13 @@ Key invariants enforced at each link:
   may be narrowed by path or by added query parameters. A `did:` target is split
   at its first `?` or `#`. Its path may be narrowed at a `/` boundary and its
   selector part must stay identical. Only the link directly beneath the root may
-  add a selector part (`baseIsRoot`). An invocation may narrow the path but must
-  keep the selectors, also after a `dereferenceTarget` mapping. A narrowed
-  target with a `.` or `..` path segment is always refused. The delegation is
-  also checked at signing time when the parent is an object.
+  add a selector part (`baseIsRoot`). Without a `dereferenceTarget` hook, an
+  invocation may narrow the path but must keep the selectors. A hook consumes
+  the selectors. Its result for a `did:` target must have no query or fragment,
+  and it is compared as a target of its own form would be. A narrowed target
+  with a `.` or `..` path segment is always refused. This covers the `%2e` form
+  and segments bounded by `\`, `%2f` or `%5c`. The delegation is also checked at
+  signing time when the parent is an object.
 - `expires` may only be made earlier, never later.
 - Delegation timestamp must not be before the parent's delegation timestamp.
 - Chain must not contain cycles.
@@ -102,9 +105,9 @@ src/
   utils.ts                  Pure helpers: createRootCapability,
                             dereferenceCapabilityChain, checkCapability,
                             computeCapabilityChain, isValidTarget, hasDotSegments,
-                            isValidDereferencedDidUrlTarget, isAbsoluteUri,
-                            getAllowedActions, getCaveats, getDelegationProofs,
-                            compareTime; also the error classes
+                            isAbsoluteUri, getAllowedActions, getCaveats,
+                            getDelegationProofs, compareTime; also the error
+                            classes
 ```
 
 ### Public API

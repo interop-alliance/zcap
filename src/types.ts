@@ -270,7 +270,10 @@ export interface CapabilityInvocationOptions extends CommonProofPurposeOptions {
    *
    * Called for every invoked capability, after the chain and the invocation
    * are verified, so it must return a target it does not map unchanged. The
-   * mapping must be deterministic and keep the path and query intact.
+   * mapping must be deterministic and keep the path intact. For a `did:`
+   * capability target the result must have no query or fragment, since
+   * dereferencing consumes the DID URL's selectors. Any other target keeps
+   * its query.
    */
   dereferenceTarget?: (options: { invocationTarget: string }) => Promise<string>
 }

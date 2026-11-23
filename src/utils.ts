@@ -295,41 +295,6 @@ export function isValidTarget({
 }
 
 /**
- * Checks a proof's `invocationTarget` against a DID URL capability target
- * that a `dereferenceTarget` hook mapped to another URI space. The DID URL
- * rule (path and selectors checked separately) is applied to the mapped
- * target, so the hook does not weaken it.
- *
- * @param options - The options.
- * @param options.invocationTarget - The proof's invocation target.
- * @param options.dereferencedTarget - The mapped capability target.
- * @param options.allowTargetAttenuation - `true` to allow target attenuation.
- *
- * @returns `true` if the target is valid, `false` if not.
- */
-export function isValidDereferencedDidUrlTarget({
-  invocationTarget,
-  dereferencedTarget,
-  allowTargetAttenuation
-}: {
-  invocationTarget: string
-  dereferencedTarget: string
-  allowTargetAttenuation?: boolean
-}): boolean {
-  if (invocationTarget === dereferencedTarget) {
-    return true
-  }
-  if (!allowTargetAttenuation || hasDotSegments(invocationTarget)) {
-    return false
-  }
-  return isValidSelectorTarget({
-    invocationTarget,
-    baseInvocationTarget: dereferencedTarget,
-    baseIsRoot: false
-  })
-}
-
-/**
  * Splits a target at the first `?` or `#` into a path part and a selector
  * part. The delimiter stays with the selector part.
  *
@@ -352,7 +317,9 @@ function splitTarget(target: string): {
  * Checks whether the path part of a target (everything before the first `?`
  * or `#`) has a `.` or `..` segment. A URL parser removes such segments, so
  * a target that passes a string prefix check could name a resource outside
- * its parent. The percent-encoded form (`%2e`) counts as a dot.
+ * its parent. The percent-encoded form (`%2e`) counts as a dot. A backslash
+ * and the percent-encoded separators (`%2f`, `%5c`) count as segment
+ * boundaries, since some servers treat them as `/`.
  *
  * @param target - The target to check.
  *
@@ -360,11 +327,9 @@ function splitTarget(target: string): {
  */
 export function hasDotSegments(target: string): boolean {
   return splitTarget(target)
-    .path.split('/')
-    .some(segment => {
-      const decoded = segment.replace(/%2e/gi, '.')
-      return decoded === '.' || decoded === '..'
-    })
+    .path.replace(/%2e/gi, '.')
+    .split(/\/|\\|%2f|%5c/i)
+    .some(segment => segment === '.' || segment === '..')
 }
 
 /**

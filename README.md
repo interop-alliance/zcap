@@ -115,10 +115,16 @@ const purpose = new CapabilityInvocation({
 })
 ```
 
-The comparison rule is unchanged (equality, or a prefix when
-`allowTargetAttenuation` is set). The hook runs only for the invoked capability,
-not for delegation links. It must return an absolute URI string, or verification
-fails.
+The hook result is compared with the proof's `invocationTarget` as a capability
+target of that form would be. The two must be equal, or the result must be a
+prefix when `allowTargetAttenuation` is set. An https result follows the https
+rule, so the request may extend the path at a `/` boundary or add a query. For a
+`did:` capability target, the hook must consume the DID URL's selectors and
+return a URI with no query or fragment. A result that carries `?` or `#` is
+refused. A selector pins the DID document version that produces the https URL. A
+query on the https request is an ordinary https query, so it is not limited by
+the pin. The hook runs only for the invoked capability, not for delegation
+links. It must return an absolute URI string, or verification fails.
 
 The hook runs after the chain and the invocation are verified. It only sees the
 target of a capability with valid delegation proofs, invoked by its controller.
@@ -127,11 +133,11 @@ The hook is called for every invocation once configured, including one whose
 chain is already in https space. It must return a target it does not map
 unchanged.
 
-The mapping must be deterministic, and it must keep the path and query of the
-target intact. Delegation links are compared in the chain's own URI space, and
-only the final comparison uses the mapped value. A mapping that drops the path
-would let a capability narrowed to one resource authorize the whole host when
-`allowTargetAttenuation` is set.
+The mapping must be deterministic, and it must keep the path of the target
+intact. A target that is not a DID URL keeps its query too. Delegation links are
+compared in the chain's own URI space, and only the final comparison uses the
+mapped value. A mapping that drops the path would let a capability narrowed to
+one resource authorize the whole host when `allowTargetAttenuation` is set.
 
 The mapped value is passed to `inspectCapabilityChain` and to the caveat
 handlers as `dereferencedTarget`. It is also set on the purpose result. The
@@ -149,17 +155,22 @@ on is the selector part, and the rest is the path part.
 The child path must equal the parent path or extend it at a `/` boundary. The
 child selector part must be byte-identical to the parent's. The one exception is
 the link directly beneath the root capability. When the root has no selector
-part, that link may carry any selector part. At invocation time the selectors
-must match the invoked capability's exactly. This also holds for the root
-capability, so it cannot be invoked with an added query.
+part, that link may carry any selector part. At invocation time, without a
+`dereferenceTarget` hook, the selectors must match the invoked capability's
+exactly. This also holds for the root capability, so it cannot be invoked with
+an added query.
 
-When a `dereferenceTarget` hook maps a DID URL capability target to another URI
-space, the same path and selector rule is applied to the mapped target.
+A DID URL capability target invoked without a `dereferenceTarget` hook is
+compared against the DID URL itself under this rule. When a hook maps it to
+another URI, the mapped target is compared under the rule for its own form
+instead. A `did:` result follows the DID URL rule, with no root exception.
 
 With `allowTargetAttenuation`, a narrowed target of any kind is refused if its
-path has a `.` or `..` segment, including the percent-encoded `%2e` form.
-Creating a delegation also fails when the parent capability is passed as an
-object and the new target is not at or beneath the parent's.
+path has a `.` or `..` segment, including the percent-encoded `%2e` form. A
+backslash and the encoded separators `%2f` and `%5c` count as segment
+boundaries, so `..%2fprivate` is refused too. Creating a delegation also fails
+when the parent capability is passed as an object and the new target is not at
+or beneath the parent's.
 
 A target that starts with `did:` is never an attenuation of one that does not,
 or the other way around. Without `allowTargetAttenuation`, targets must be
