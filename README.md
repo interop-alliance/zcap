@@ -323,6 +323,27 @@ const purpose = new CapabilityInvocation({
 Only allow contexts you control or have reviewed. A context that defines a
 second term for `allowedAction` or `caveat` brings the problem back.
 
+### Expired capabilities
+
+Verifying an invocation fails with a `CapabilityExpiredError` when the invoked
+capability or a capability in its delegation chain has expired. Verifying a
+delegation fails the same way when the delegated capability or one of its
+ancestors has expired. Match on the error's `name`.
+
+```js
+// result.verified === false
+// result.error.errors[0].name === 'CapabilityExpiredError'
+```
+
+When verification fails with this error, every delegation proof in the chain has
+verified. An invocation also comes from the controller of the invoked
+capability. A chain that holds an expired capability and a forged or altered
+delegation fails with the proof error instead. The same holds for any other
+delegation rule that the chain breaks, such as a relaxed `allowedAction`.
+
+This covers verification only. Signing a delegation of an expired capability
+throws the same error with no proof checked.
+
 ## Develop
 
 The source is TypeScript under `src/`; tests use [Vitest](https://vitest.dev)

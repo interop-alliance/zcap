@@ -154,7 +154,13 @@ URIs), then dereferences the root via a verifier-supplied trusted
 tail, calling `jsigs.verify` for each delegation proof and re-checking
 delegation invariants (allowedAction, target, expires, timing, TTL). Uses
 `_verifiedParentCapability` to avoid re-verifying already-checked parent
-segments.
+segments. An expired capability does not stop the walk. The expiry is recorded
+and passed to `_runChecksAfterChainVerification`, which throws it after the
+controller check and base proof validation. So a `CapabilityExpiredError` raised
+while verifying means the whole chain's delegation proofs verified, and for an
+invocation that the invoker is the capability's controller. Verifying a
+delegation also checks the tail's own `expires`. The error raised at signing
+time (`CapabilityDelegation.update`) carries no such guarantee.
 
 **`_resolveCaveats`** (`CapabilityProofPurpose.ts`): Runs right after the chain
 is dereferenced, before any proof is verified. Collects the caveats of every

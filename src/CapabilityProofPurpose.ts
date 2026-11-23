@@ -216,7 +216,11 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
     /* Note: Trust begins at the root zcap, so we start chain validation at
     the root and move forward toward the tail from there. This also helps
     prevent an attacker from wasting time when they submit long zcap chains
-    that are extensions of otherwise valid chains.
+    that are extensions of otherwise valid chains. A forged or invalid
+    extension stops the walk at the first bad link. An expired capability
+    deliberately does not. The walk goes on to verify every later delegation
+    proof, so an expired chain costs as much to reject as a valid chain of the
+    same length costs to accept (bounded by `maxChainLength`).
 
     So, each parent zcap must be verified before its child is. This also means
     that we can't simply recursively unwind the chain in reverse; therefore,
@@ -254,12 +258,17 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
       ensures we don't call this more than once. Additionally, the
       `capabilityChainMeta` array signals whether we need to cryptographically
       verify the capability delegation proof on the tail or if we must skip
-      this to avoid duplicating that work.
+      this to avoid duplicating that work. An expired capability does not
+      fail this step. The walk records the expiry and returns it as
+      `expiredError`.
     4. Run any purpose-specific checks after chain verification. This allows
       capability delegation proof checks to be run on the tail against the now
       verified parent, allowing its proof validation result to be fully
       constructed and updated in the `capabilityChainMeta` array (as well
-      as the return value for this function).
+      as the return value for this function). The `expiredError` from step 3
+      is passed in. The purpose throws it once the tail's proof is known to
+      come from the right controller, so an expiry is reported only for a
+      chain and a proof that are otherwise authentic.
     5. Run the `inspectCapabilityChain` hook, if given, to allow for custom
       implementations to check for revoked zcaps in databases or whatever other
       behavior is desired.
@@ -311,30 +320,37 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
           proof,
           validateOptions
         })
-
       /* 3. Verify the capability delegation chain. This will make sure that
       the root zcap in the chain is as expected (for the endpoint where the
       invocation occurred) and that every other zcap in the chain (including
       the invoked one), has been properly delegated. */
-      const { verified, error } = await this._verifyCapabilityChain({
-        // required to avoid circular dependencies
-        CapabilityDelegation: this._getCapabilityDelegationClass(),
-        capabilityChainMeta,
-        dereferencedChain,
-        documentLoader
-      })
+      const { verified, error, expiredError } =
+        await this._verifyCapabilityChain({
+          // required to avoid circular dependencies
+          CapabilityDelegation: this._getCapabilityDelegationClass(),
+          capabilityChainMeta,
+          dereferencedChain,
+          documentLoader
+        })
       if (!verified) {
         throw error
       }
 
       /* 4. Run any proof-purpose-specific checks after chain verification
-        to get the proof validation result. */
+        to get the proof validation result. An expired capability in the chain
+        is reported from inside this step, after the controller of the proof
+        being validated has been checked. */
       const validateResult = await this._runChecksAfterChainVerification({
         capabilityChainMeta,
         dereferencedChain,
+        expiredError,
         proof,
         validateOptions
       })
+      // step 4 throws the expiry; this covers a purpose that does not
+      if (expiredError) {
+        throw expiredError
+      }
 
       // set only by an invocation check with a `dereferenceTarget` hook
       const { dereferencedTarget } = validateResult
@@ -532,6 +548,40 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
   }
 
   /**
+   * Throws a `CapabilityExpiredError` if the given capability is delegated
+   * and its `expires` is before the current date, allowing for clock skew.
+   *
+   * @param options - The options.
+   * @param options.capability - The capability to check.
+   * @param options.message - The error message to use.
+   */
+  _checkNotExpired({
+    capability,
+    message
+  }: {
+    capability: IZcap
+    message: string
+  }): void {
+    if (!('parentCapability' in capability)) {
+      return
+    }
+    // use `utils.compareTime` to allow for clock drift because we are
+    // comparing against `currentDate`
+    const { date, maxClockSkew = 300 } = this
+    const currentDate = (date && new Date(date)) || new Date()
+    if (
+      utils.compareTime({
+        t1: currentDate.getTime(),
+        // expires date has been previously validated, so just parse it
+        t2: Date.parse(capability.expires),
+        maxClockSkew
+      }) > 0
+    ) {
+      throw new utils.CapabilityExpiredError(message)
+    }
+  }
+
+  /**
    * Returns the `CapabilityDelegation` class, passed in by derived classes to
    * avoid a circular import. Abstract; must be overridden.
    *
@@ -583,6 +633,7 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
   async _runChecksAfterChainVerification(_options: {
     capabilityChainMeta: CapabilityMeta[]
     dereferencedChain: IZcap[]
+    expiredError?: Error
     proof: IProofDescription
     validateOptions: ValidateOptions
   }): Promise<CapabilityValidateResult> {
@@ -650,7 +701,10 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
    *   `capability`, starting at the root capability and ending at `capability`.
    * @param options.documentLoader - A configured jsonld documentLoader.
    *
-   * @returns Resolves to an object with `{verified, error}`.
+   * @returns Resolves to an object with `{verified, error, expiredError}`.
+   *   `expiredError` is set when the walk passed and a capability in the
+   *   chain has expired. The caller throws it once every delegation proof in
+   *   the chain has verified.
    */
   async _verifyCapabilityChain({
     CapabilityDelegation,
@@ -662,7 +716,7 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
     capabilityChainMeta: CapabilityMeta[]
     dereferencedChain: IZcap[]
     documentLoader?: IDocumentLoader
-  }): Promise<{ verified: boolean; error?: Error }> {
+  }): Promise<{ verified: boolean; error?: Error; expiredError?: Error }> {
     /* Note: We start verifying a capability chain at its root of trust (the
     root capability) and then move toward the tail. To prevent recursively
     repeating checks, we pass a `verifiedParentCapability` each time we start
@@ -673,7 +727,9 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
     1. If the chain only has the root capability, exit early.
     2. For each capability `zcap` in the chain, verify the capability delegation
       proof on `zcap` (if `capabilityChainMeta` has no precomputed result) and
-      that all of the delegation rules have been followed. */
+      that all of the delegation rules have been followed. An expired
+      capability does not stop the walk. It is recorded and returned, so that
+      the delegation proofs of the later capabilities are still verified. */
 
     try {
       // 1. If the chain only has the root, exit early.
@@ -691,6 +747,8 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
       let parentDelegationTime: number | undefined
       let parentExpirationTime: number | undefined
       let parentInvocationTarget = root!.invocationTarget
+      // set for the earliest expired capability in the chain
+      let expiredError: Error | undefined
 
       // track whether `capabilityChainMeta` needs its first result shifted to
       // the end (if a result was present, it is for the last or "tail" zcap,
@@ -799,13 +857,14 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
           // use `utils.compareTime` to allow for allow for clock drift because
           // we are comparing against `currentDate`
           if (
+            !expiredError &&
             utils.compareTime({
               t1: currentDate.getTime(),
               t2: parentExpirationTime,
               maxClockSkew
             }) > 0
           ) {
-            throw new utils.CapabilityExpiredError(
+            expiredError = new utils.CapabilityExpiredError(
               'A capability in the delegation chain has expired.'
             )
           }
@@ -836,11 +895,15 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
           revoked, will have to be stored for long periods of time. We have to
           ensure:
 
-          1. The zcap's delegation date is not in the future (this also ensures
-            that the zcap's expiration date is not before its delegation date
-            as it would have triggered an expiration error in a previous check).
+          1. The zcap's delegation date is not in the future.
           2. The zcap's current TTL is <= `maxDelegationTtl`
-          3. The zcap's TTL was never > `maxDelegationTtl`. */
+          3. The zcap's TTL was never > `maxDelegationTtl`.
+
+          An expired zcap gets this far, because its expiry is recorded above
+          and thrown later. Its current TTL is then negative and passes check
+          2. A zcap that expires before its own delegation date has a negative
+          maximum TTL and passes check 3. Neither is accepted, since the
+          recorded expiry still fails the chain. */
 
           // use `utils.compareTime` to allow for allow for clock drift because
           // we are comparing against `currentDate`
@@ -887,7 +950,7 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
         capabilityChainMeta.push(capabilityChainMeta.shift()!)
       }
 
-      return { verified: true }
+      return { verified: true, expiredError }
     } catch (error) {
       return { verified: false, error: error as Error }
     }

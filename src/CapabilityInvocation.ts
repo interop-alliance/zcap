@@ -478,14 +478,17 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
 
   /**
    * Runs invocation-specific checks after chain verification: that the invoking
-   * verification method (or its controller) is the capability controller, that
-   * a delegated capability has not expired, and the base proof validation. Sets
+   * verification method (or its controller) is the capability controller, the
+   * base proof validation, and that no capability in the chain has expired
+   * (the invoked one included). Sets
    * `result.invoker` to the proof controller. With a `dereferenceTarget` hook,
    * it then calls the hook and compares the proof's `invocationTarget` against
    * the dereferenced capability target, set as `result.dereferencedTarget`.
    *
    * @param options - The options.
    * @param options.dereferencedChain - The dereferenced chain (root to tail).
+   * @param options.expiredError - The expiry recorded by the chain walk, if a
+   *   capability above the invoked one has expired.
    * @param options.proof - The capability invocation proof.
    * @param options.validateOptions - The validation options passed through from
    *   `jsigs` (including `verificationMethod`).
@@ -494,11 +497,13 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
    */
   async _runChecksAfterChainVerification({
     dereferencedChain,
+    expiredError,
     proof,
     validateOptions
   }: {
     capabilityChainMeta: CapabilityMeta[]
     dereferencedChain: IZcap[]
+    expiredError?: Error
     proof: IProofDescription
     validateOptions: ValidateOptions
   }): Promise<CapabilityValidateResult> {
@@ -519,29 +524,6 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
       )
     }
 
-    // if capability is delegated, verify that it has not expired
-    if ('parentCapability' in capability) {
-      // verify expiration dates
-      // expires date has been previously validated, so just parse it
-      const currentCapabilityExpirationTime = Date.parse(capability.expires)
-
-      // use `utils.compareTime` to allow for allow for clock drift because
-      // we are comparing against `currentDate`
-      const { date, maxClockSkew = 300 } = this
-      const currentDate = (date && new Date(date)) || new Date()
-      if (
-        utils.compareTime({
-          t1: currentDate.getTime(),
-          t2: currentCapabilityExpirationTime,
-          maxClockSkew
-        }) > 0
-      ) {
-        throw new utils.CapabilityExpiredError(
-          'The invoked capability has expired.'
-        )
-      }
-    }
-
     // run base level validation checks
     const result = await this._runBaseProofValidation({
       proof,
@@ -550,6 +532,17 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     if (!result.valid) {
       throw result.error
     }
+
+    /* Report an expiry only now. The chain's delegation proofs have verified
+    and the invocation comes from the capability's controller, so the error
+    means an authentic invocation of an expired capability. */
+    if (expiredError) {
+      throw expiredError
+    }
+    this._checkNotExpired({
+      capability,
+      message: 'The invoked capability has expired.'
+    })
 
     // the controller of the verification method from the proof is the
     // invoker of the capability

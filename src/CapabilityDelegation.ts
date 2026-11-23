@@ -384,12 +384,15 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
   /**
    * Validates the tail delegation proof against its now-verified parent (the
    * second-to-last entry in the chain) and builds the tail's full
-   * `verifyResult` in `capabilityChainMeta`.
+   * `verifyResult` in `capabilityChainMeta`. Then fails if a capability in the
+   * chain has expired, the tail included.
    *
    * @param options - The options.
    * @param options.capabilityChainMeta - The chain meta array; its last entry's
    *   placeholder `verifyResult` is populated here.
    * @param options.dereferencedChain - The dereferenced chain (root to tail).
+   * @param options.expiredError - The expiry recorded by the chain walk, if a
+   *   capability above the tail has expired.
    * @param options.proof - The capability delegation proof.
    * @param options.validateOptions - The validation options passed through from
    *   `jsigs` (including `verificationMethod`).
@@ -399,11 +402,13 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
   async _runChecksAfterChainVerification({
     capabilityChainMeta,
     dereferencedChain,
+    expiredError,
     proof,
     validateOptions
   }: {
     capabilityChainMeta: CapabilityMeta[]
     dereferencedChain: IZcap[]
+    expiredError?: Error
     proof: IProofDescription
     validateOptions: ValidateOptions
   }): Promise<CapabilityValidateResult> {
@@ -417,6 +422,17 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
       proof,
       verifiedParentCapability,
       validateOptions
+    })
+
+    /* Report an expiry only now, with every delegation proof in the chain
+    verified. The walk only compares each parent's `expires` to the current
+    date, so the tail's own `expires` is checked here. */
+    if (expiredError) {
+      throw expiredError
+    }
+    this._checkNotExpired({
+      capability: dereferencedChain[dereferencedChain.length - 1]!,
+      message: 'The delegated capability has expired.'
     })
 
     // build verify result

@@ -1,5 +1,21 @@
 # @interop/zcap ChangeLog
 
+## 12.3.1 - TBD
+
+### Fixed
+
+- `CapabilityExpiredError` for a capability in the delegation chain is now
+  raised only after every delegation proof in the chain has verified. Before, a
+  chain with an expired capability failed with the expiry error while the proofs
+  of the later capabilities were still unverified.
+- A chain that has an expired capability and also breaks another delegation rule
+  now fails with that rule's error.
+- An invocation of an expired capability by someone other than its controller
+  now fails with the controller error. The expiry is reported after the
+  controller check and base proof validation.
+- Verifying a delegation now fails with `CapabilityExpiredError` when the
+  delegated capability itself has expired.
+
 ## 12.3.0 - 2026-11-22
 
 ### Changed

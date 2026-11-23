@@ -1052,6 +1052,11 @@ export function createDetailedError(
  * has already expired at delegation time. Callers should check `name`
  * rather than use `instanceof`, since `name` survives realm and
  * package-copy boundaries.
+ *
+ * When a proof purpose raises this error while verifying, every delegation
+ * proof in the chain has verified, and an invocation comes from the
+ * capability's controller. A chain with an expired capability and a forged or
+ * altered delegation fails with the proof error instead.
  */
 export class CapabilityExpiredError extends Error {
   constructor(message: string) {

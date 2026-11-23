@@ -3668,6 +3668,274 @@ describe('zcap', () => {
         }
       )
 
+      describe('expired capability with later delegations', () => {
+        // the Unix epoch, which is in the past
+        const expires = new Date(0).toISOString()
+
+        // delegates an already expired zcap
+        async function _delegateExpired({
+          parentCapability,
+          controller,
+          delegator,
+          expires: zcapExpires = expires
+        }) {
+          return _delegate({
+            newCapability: {
+              '@context': ZCAP_CONTEXT_URL,
+              id: uuid(),
+              controller: controller.id(),
+              parentCapability: parentCapability.id,
+              invocationTarget: parentCapability.invocationTarget,
+              expires: zcapExpires
+            },
+            purposeOptions: {
+              // do not validate locally to allow expired zcap to be delegated
+              _skipLocalValidationForTesting: true
+            },
+            parentCapability,
+            delegator
+          })
+        }
+
+        function _rootCapability() {
+          const rootCapability = { ...capabilities.root.beta, id: uuid() }
+          addToLoader({ doc: rootCapability })
+          return rootCapability
+        }
+
+        // root > bob > carol > `controller`, all expired; the last link is
+        // signed by `delegator`
+        async function _threeLinkChain({
+          rootCapability,
+          controller,
+          delegator = carol
+        }) {
+          const bobZcap = await _delegateExpired({
+            parentCapability: rootCapability,
+            controller: bob,
+            delegator: alice
+          })
+          const carolZcap = await _delegateExpired({
+            parentCapability: bobZcap,
+            controller: carol,
+            delegator: bob
+          })
+          return _delegateExpired({
+            parentCapability: carolZcap,
+            controller,
+            delegator
+          })
+        }
+
+        it('should report an altered later delegation, not the expiry', async () => {
+          const rootCapability = _rootCapability()
+          // carol delegates to alice; diana takes the zcap and makes herself
+          // its controller without a new proof
+          const dianaZcap = await _threeLinkChain({
+            rootCapability,
+            controller: alice
+          })
+          dianaZcap.controller = diana.id()
+
+          const invocation = await _invoke({
+            doc: clone(mock.exampleDoc),
+            invoker: diana,
+            capability: dianaZcap,
+            capabilityAction: 'read'
+          })
+          const result = await _verifyInvocation({
+            invocation,
+            rootCapability,
+            expectedAction: 'read'
+          })
+          expect(result.verified).toBe(false)
+          expect(result.error.errors).toHaveLength(1)
+          const [error] = result.error.errors
+          // the failed verification of the altered zcap's delegation proof
+          expect(error.name).toBe('VerificationError')
+          expect(error.errors).toHaveLength(1)
+          expect(error.errors[0].message).toBe('Invalid signature.')
+        })
+
+        it('should report the expiry when every delegation verifies', async () => {
+          const rootCapability = _rootCapability()
+          const dianaZcap = await _threeLinkChain({
+            rootCapability,
+            controller: diana
+          })
+
+          const invocation = await _invoke({
+            doc: clone(mock.exampleDoc),
+            invoker: diana,
+            capability: dianaZcap,
+            capabilityAction: 'read'
+          })
+          let inspected = false
+          const result = await _verifyInvocation({
+            invocation,
+            rootCapability,
+            expectedAction: 'read',
+            inspectCapabilityChain: async () => {
+              inspected = true
+              return { valid: true }
+            }
+          })
+          expect(result.verified).toBe(false)
+          expect(result.error.errors).toHaveLength(1)
+          const [error] = result.error.errors
+          expect(error.name).toBe('CapabilityExpiredError')
+          expect(error.message).toBe(
+            'A capability in the delegation chain has expired.'
+          )
+          expect(inspected).toBe(false)
+        })
+
+        it(
+          'should report a delegation by the wrong controller, not the ' +
+            'expiry, when verifying a delegation',
+          async () => {
+            const rootCapability = _rootCapability()
+            // diana is not the controller of carol's zcap
+            const delegation = await _threeLinkChain({
+              rootCapability,
+              controller: diana,
+              delegator: diana
+            })
+
+            const result = await _verifyDelegation({
+              delegation,
+              expectedRootCapability: rootCapability.id
+            })
+            expect(result.verified).toBe(false)
+            expect(result.error.errors).toHaveLength(1)
+            const [error] = result.error.errors
+            expect(error.name).not.toBe('CapabilityExpiredError')
+            expect(error.message).toContain(
+              'The capability controller does not match the verification ' +
+                'method (or its controller) used to delegate.'
+            )
+          }
+        )
+
+        it(
+          'should report the expiry when verifying a delegation whose ' +
+            'chain verifies',
+          async () => {
+            const rootCapability = _rootCapability()
+            const delegation = await _threeLinkChain({
+              rootCapability,
+              controller: diana
+            })
+
+            const result = await _verifyDelegation({
+              delegation,
+              expectedRootCapability: rootCapability.id
+            })
+            expect(result.verified).toBe(false)
+            expect(result.error.errors).toHaveLength(1)
+            const [error] = result.error.errors
+            expect(error.name).toBe('CapabilityExpiredError')
+            expect(error.message).toBe(
+              'A capability in the delegation chain has expired.'
+            )
+          }
+        )
+
+        it(
+          'should report an expired tail when verifying a delegation ' +
+            'directly beneath the root',
+          async () => {
+            const rootCapability = _rootCapability()
+            const delegation = await _delegateExpired({
+              parentCapability: rootCapability,
+              controller: bob,
+              delegator: alice
+            })
+
+            const result = await _verifyDelegation({
+              delegation,
+              expectedRootCapability: rootCapability.id
+            })
+            expect(result.verified).toBe(false)
+            expect(result.error.errors).toHaveLength(1)
+            const [error] = result.error.errors
+            expect(error.name).toBe('CapabilityExpiredError')
+            expect(error.message).toBe('The delegated capability has expired.')
+          }
+        )
+
+        it(
+          'should report a relaxed `expires`, not the expiry, when ' +
+            'verifying a delegation',
+          async () => {
+            const rootCapability = _rootCapability()
+            const bobZcap = await _delegateExpired({
+              parentCapability: rootCapability,
+              controller: bob,
+              delegator: alice
+            })
+            // carol's zcap is expired too, but outlives its parent
+            const carolZcap = await _delegateExpired({
+              parentCapability: bobZcap,
+              controller: carol,
+              delegator: bob,
+              expires: new Date(60 * 60 * 1000).toISOString()
+            })
+            const delegation = await _delegateExpired({
+              parentCapability: carolZcap,
+              controller: diana,
+              delegator: carol
+            })
+
+            const result = await _verifyDelegation({
+              delegation,
+              expectedRootCapability: rootCapability.id
+            })
+            expect(result.verified).toBe(false)
+            expect(result.error.errors).toHaveLength(1)
+            const [error] = result.error.errors
+            expect(error.name).not.toBe('CapabilityExpiredError')
+            expect(error.message).toBe(
+              'The `expires` property in a delegated capability must not ' +
+                'be less restrictive than its parent.'
+            )
+          }
+        )
+
+        it(
+          'should report an invocation by the wrong controller, not the ' +
+            'expiry',
+          async () => {
+            const rootCapability = _rootCapability()
+            const dianaZcap = await _threeLinkChain({
+              rootCapability,
+              controller: diana
+            })
+
+            // bob is not the controller of diana's zcap
+            const invocation = await _invoke({
+              doc: clone(mock.exampleDoc),
+              invoker: bob,
+              capability: dianaZcap,
+              capabilityAction: 'read'
+            })
+            const result = await _verifyInvocation({
+              invocation,
+              rootCapability,
+              expectedAction: 'read'
+            })
+            expect(result.verified).toBe(false)
+            expect(result.error.errors).toHaveLength(1)
+            const [error] = result.error.errors
+            expect(error.name).not.toBe('CapabilityExpiredError')
+            expect(error.message).toContain(
+              'The capability controller does not match the verification ' +
+                'method (or its controller) used to invoke.'
+            )
+          }
+        )
+      })
+
       it(
         'should fail invoking a capability with expired ' +
           'second delegated capability',
