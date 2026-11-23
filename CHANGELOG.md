@@ -1,5 +1,27 @@
 # @interop/zcap ChangeLog
 
+## 12.2.0 - TBD
+
+### Changed
+
+- With `allowTargetAttenuation`, a DID URL target is attenuated by path and
+  selectors separately. The child path extends the parent's at a `/` boundary,
+  and the selectors after the first `?` or `#` must match exactly. Only the link
+  directly beneath the root may introduce selectors. `isValidTarget` takes an
+  optional `baseIsRoot` flag.
+- DID URL chains and invocations that add or extend a query are now refused.
+  This includes invoking a root zcap with an added query. The same rule applies
+  to the target returned by a `dereferenceTarget` hook when the capability
+  target is a DID URL.
+- A narrowed target with a `.` or `..` path segment (or its `%2e` form) is
+  refused, for DID URL and other targets.
+- Delegating a zcap whose target is not at or beneath its parent's now throws
+  when the parent is passed as an object.
+
+### Fixed
+
+- `isValidTarget` returns `false` for a non-string target.
+
 ## 12.1.0 - 2026-11-22
 
 ### Added

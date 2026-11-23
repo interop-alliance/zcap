@@ -455,13 +455,20 @@ export class CapabilityInvocation extends CapabilityProofPurpose {
     const { allowTargetAttenuation } = this
     const capabilityTarget = utils.getTarget({ capability })
     const invocationTarget = proof.invocationTarget as string
-    if (
-      !utils.isValidTarget({
-        invocationTarget,
-        baseInvocationTarget: dereferencedTarget ?? capabilityTarget,
-        allowTargetAttenuation
-      })
-    ) {
+    // a DID URL target keeps its path and selector rule after dereferencing
+    const valid =
+      dereferencedTarget !== undefined && capabilityTarget.startsWith('did:')
+        ? utils.isValidDereferencedDidUrlTarget({
+            invocationTarget,
+            dereferencedTarget,
+            allowTargetAttenuation
+          })
+        : utils.isValidTarget({
+            invocationTarget,
+            baseInvocationTarget: dereferencedTarget ?? capabilityTarget,
+            allowTargetAttenuation
+          })
+    if (!valid) {
       const dereferencedTo =
         dereferencedTarget === undefined
           ? ''

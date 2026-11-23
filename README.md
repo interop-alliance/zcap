@@ -139,6 +139,33 @@ capabilities in the chain keep their original targets, so a handler that
 compares paths should use `dereferencedTarget` together with the proof's
 `invocationTarget`.
 
+#### DID URL target attenuation
+
+When both the parent and the child `invocationTarget` start with `did:` and
+`allowTargetAttenuation` is set, the path and the selectors are checked
+separately. The target is split at its first `?` or `#`. Everything from there
+on is the selector part, and the rest is the path part.
+
+The child path must equal the parent path or extend it at a `/` boundary. The
+child selector part must be byte-identical to the parent's. The one exception is
+the link directly beneath the root capability. When the root has no selector
+part, that link may carry any selector part. At invocation time the selectors
+must match the invoked capability's exactly. This also holds for the root
+capability, so it cannot be invoked with an added query.
+
+When a `dereferenceTarget` hook maps a DID URL capability target to another URI
+space, the same path and selector rule is applied to the mapped target.
+
+With `allowTargetAttenuation`, a narrowed target of any kind is refused if its
+path has a `.` or `..` segment, including the percent-encoded `%2e` form.
+Creating a delegation also fails when the parent capability is passed as an
+object and the new target is not at or beneath the parent's.
+
+A target that starts with `did:` is never an attenuation of one that does not,
+or the other way around. Without `allowTargetAttenuation`, targets must be
+equal. The rule for other targets is unchanged. `isValidTarget` takes an
+optional `baseIsRoot` flag for the root exception.
+
 #### Registering caveat handlers
 
 To support a caveat type, pass a `supportedCaveats` map when verifying. The keys

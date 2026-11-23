@@ -4417,7 +4417,8 @@ describe('zcap', () => {
               expires: EXPIRES_3000_DATE
             },
             parentCapability: carolZcap,
-            delegator: carol
+            delegator: carol,
+            purposeOptions: { _skipLocalValidationForTesting: true }
           })
 
           const result = await _verifyDelegation({
@@ -4487,7 +4488,8 @@ describe('zcap', () => {
               expires: EXPIRES_3000_DATE
             },
             parentCapability: carolZcap,
-            delegator: carol
+            delegator: carol,
+            purposeOptions: { _skipLocalValidationForTesting: true }
           })
 
           const result = await _verifyDelegation({
@@ -5211,7 +5213,8 @@ describe('zcap', () => {
               expires: EXPIRES_3000_DATE
             },
             parentCapability: carolZcap,
-            delegator: carol
+            delegator: carol,
+            purposeOptions: { _skipLocalValidationForTesting: true }
           })
 
           let checkedChain = 0
@@ -5251,6 +5254,208 @@ describe('zcap', () => {
       )
     }) // end Path-based hierarchical attenuation
   })
+  describe('DID URL target attenuation', () => {
+    // `skipLocalValidation` signs the second link without the delegation-time
+    // target check, to build a chain only the verifier can refuse
+    async function _chain({
+      link1Target,
+      link2Target,
+      skipLocalValidation = false
+    }) {
+      const didPath = `did:webvh:${uuid().slice(9)}:alice.example/photos`
+      const swap = (target: string) => target.replace('DID', didPath)
+      link1Target = swap(link1Target)
+      link2Target = swap(link2Target)
+      const rootCapability = createRootCapability({
+        controller: alice.id(),
+        invocationTarget: didPath
+      })
+      addToLoader({ doc: rootCapability })
+      const delegate = ({
+        parent,
+        controller,
+        delegator,
+        target,
+        purposeOptions = undefined
+      }) =>
+        _delegate({
+          newCapability: {
+            '@context': ZCAP_CONTEXT_URL,
+            id: uuid(),
+            controller: controller.id(),
+            parentCapability: parent.id,
+            invocationTarget: target,
+            expires: EXPIRES_3000_DATE
+          },
+          parentCapability: parent,
+          delegator,
+          purposeOptions
+        })
+      const bobZcap = await delegate({
+        parent: rootCapability,
+        controller: bob,
+        delegator: alice,
+        target: link1Target
+      })
+      const carolZcap = await delegate({
+        parent: bobZcap,
+        controller: carol,
+        delegator: bob,
+        target: link2Target,
+        purposeOptions: skipLocalValidation
+          ? { _skipLocalValidationForTesting: true }
+          : undefined
+      })
+      return { didPath, rootCapability, bobZcap, carolZcap }
+    }
+
+    const _expectTargetRefused = result => {
+      expect(result.verified).toBe(false)
+      expect(result.error.errors[0].message).toContain(
+        'The "invocationTarget" in a delegated capability must not be ' +
+          'less restrictive than its parent.'
+      )
+    }
+
+    // invokes `capability` at `target` and verifies in DID URL space
+    async function _verifyAt({ rootCapability, capability, invoker, target }) {
+      return _verifyInvocation({
+        invocation: await _invoke({
+          doc: clone(mock.exampleDoc),
+          invoker,
+          purposeOptions: {
+            capability: capability.parentCapability
+              ? capability
+              : capability.id,
+            capabilityAction: 'read',
+            invocationTarget: target
+          }
+        }),
+        purposeOptions: {
+          expectedAction: 'read',
+          expectedTarget: target,
+          expectedRootCapability: rootCapability.id,
+          allowTargetAttenuation: true
+        }
+      })
+    }
+
+    it('verifies a chain whose first link adds a selector', async () => {
+      const { rootCapability, carolZcap } = await _chain({
+        link1Target: `DID/?versionId=3`,
+        link2Target: `DID/2024/?versionId=3`
+      })
+      const result = await _verifyDelegation({
+        delegation: carolZcap,
+        expectedRootCapability: rootCapability.id,
+        purposeOptions: { allowTargetAttenuation: true }
+      })
+      expect(result.verified).toBe(true)
+    })
+
+    it('refuses a chain whose second link adds a selector', async () => {
+      const { rootCapability, carolZcap } = await _chain({
+        link1Target: 'DID',
+        link2Target: `DID/2024?versionId=3`,
+        skipLocalValidation: true
+      })
+      _expectTargetRefused(
+        await _verifyDelegation({
+          delegation: carolZcap,
+          expectedRootCapability: rootCapability.id,
+          purposeOptions: { allowTargetAttenuation: true }
+        })
+      )
+    })
+
+    it('refuses a chain whose second link extends the selector', async () => {
+      const { rootCapability, carolZcap } = await _chain({
+        link1Target: `DID?versionId=3`,
+        link2Target: `DID?versionId=3&versionId=4`,
+        skipLocalValidation: true
+      })
+      _expectTargetRefused(
+        await _verifyDelegation({
+          delegation: carolZcap,
+          expectedRootCapability: rootCapability.id,
+          purposeOptions: { allowTargetAttenuation: true }
+        })
+      )
+    })
+
+    it('refuses a chain whose second link has a dot segment', async () => {
+      const { rootCapability, carolZcap } = await _chain({
+        link1Target: 'DID/2024',
+        link2Target: 'DID/2024/../private',
+        skipLocalValidation: true
+      })
+      _expectTargetRefused(
+        await _verifyDelegation({
+          delegation: carolZcap,
+          expectedRootCapability: rootCapability.id,
+          purposeOptions: { allowTargetAttenuation: true }
+        })
+      )
+    })
+
+    it('refuses to delegate a selector under a non-root parent', async () => {
+      await expect(
+        _chain({ link1Target: 'DID', link2Target: `DID/2024?versionId=3` })
+      ).rejects.toThrow(
+        'The "invocationTarget" in a delegated capability must not be ' +
+          'less restrictive than its parent.'
+      )
+    })
+
+    it('verifies an invocation that narrows the path only', async () => {
+      const { didPath, rootCapability, carolZcap } = await _chain({
+        link1Target: `DID?versionId=3`,
+        link2Target: `DID?versionId=3`
+      })
+      const result = await _verifyAt({
+        rootCapability,
+        capability: carolZcap,
+        invoker: carol,
+        target: `${didPath}/2024?versionId=3`
+      })
+      expect(result.verified).toBe(true)
+    })
+
+    it('refuses an invocation that extends the selector', async () => {
+      const { didPath, rootCapability, carolZcap } = await _chain({
+        link1Target: `DID?versionId=3`,
+        link2Target: `DID?versionId=3`
+      })
+      const result = await _verifyAt({
+        rootCapability,
+        capability: carolZcap,
+        invoker: carol,
+        target: `${didPath}?versionId=3&versionId=4`
+      })
+      expect(result.verified).toBe(false)
+      expect(result.error.errors[0].message).toContain(
+        'does not match capability target'
+      )
+    })
+
+    it('refuses a root invocation that adds a selector', async () => {
+      const { didPath, rootCapability } = await _chain({
+        link1Target: 'DID',
+        link2Target: 'DID'
+      })
+      const result = await _verifyAt({
+        rootCapability,
+        capability: rootCapability,
+        invoker: alice,
+        target: `${didPath}?limit=10`
+      })
+      expect(result.verified).toBe(false)
+      expect(result.error.errors[0].message).toContain(
+        'does not match capability target'
+      )
+    })
+  })
+
   describe('dereferenceTarget', () => {
     // a chain that lives in DID URL space, invoked at an https URL
     async function _setup({ attenuate = false } = {}) {
@@ -5353,6 +5558,51 @@ describe('zcap', () => {
       expect(result.error.errors[0].message).toContain(
         'does not match capability target'
       )
+    })
+
+    it('should keep the selector rule after dereferencing', async () => {
+      const didTarget = `did:webvh:${uuid().slice(9)}:alice.example/photos?versionId=3`
+      const httpsTarget = 'https://alice.example/photos?versionId=3'
+      const rootCapability = createRootCapability({
+        controller: alice.id(),
+        invocationTarget: didTarget
+      })
+      addToLoader({ doc: rootCapability })
+      const carolZcap = await _delegate({
+        parentCapability: rootCapability,
+        controller: carol,
+        delegator: alice
+      })
+      const setup = { didTarget, httpsTarget, rootCapability, carolZcap }
+      const options = {
+        setup,
+        allowTargetAttenuation: true,
+        dereferenceTarget: _toHttps
+      }
+
+      // path narrowing with the same selector
+      const narrowed = await _verifyAt({
+        ...options,
+        target: 'https://alice.example/photos/2024?versionId=3'
+      })
+      expect(narrowed.verified).toBe(true)
+
+      // the selector may not be extended
+      const extended = await _verifyAt({
+        ...options,
+        target: `${httpsTarget}&versionId=4`
+      })
+      expect(extended.verified).toBe(false)
+      expect(extended.error.errors[0].message).toContain(
+        'does not match capability target'
+      )
+
+      // a dot segment is not a narrowing
+      const dotted = await _verifyAt({
+        ...options,
+        target: 'https://alice.example/photos/../private?versionId=3'
+      })
+      expect(dotted.verified).toBe(false)
     })
 
     it('should fail when the hook returns a non-absolute value', async () => {

@@ -247,6 +247,24 @@ export class CapabilityDelegation extends CapabilityProofPurpose {
         )
       }
 
+      // ensure `invocationTarget` is at or beneath the parent's. The
+      // verifier's `allowTargetAttenuation` setting is not known here, so
+      // only a target that no verifier would accept is refused.
+      if (
+        parent &&
+        !utils.isValidTarget({
+          invocationTarget: utils.getTarget({ capability }),
+          baseInvocationTarget: utils.getTarget({ capability: parent }),
+          allowTargetAttenuation: true,
+          baseIsRoot: !('parentCapability' in parent)
+        })
+      ) {
+        throw new Error(
+          'The "invocationTarget" in a delegated capability must not be ' +
+            'less restrictive than its parent.'
+        )
+      }
+
       // ensure `expires` is not less restrictive
       const parentExpires =
         parent && 'expires' in parent ? parent.expires : undefined

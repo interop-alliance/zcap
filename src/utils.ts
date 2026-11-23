@@ -213,62 +213,194 @@ export function getCapabilityChain({
  * @param options.invocationTarget - The invocation target to check.
  * @param options.baseInvocationTarget - The base invocation target.
  * @param options.allowTargetAttenuation - `true` to allow target attenuation.
+ * @param [options.baseIsRoot] - `true` if the base target is the root
+ *   capability's. Only used for DID URL targets, where it lets the child
+ *   introduce selectors. Leave unset when checking an invocation.
  *
  * @returns `true` if the target is valid, `false` if not.
  */
 export function isValidTarget({
   invocationTarget,
   baseInvocationTarget,
-  allowTargetAttenuation
+  allowTargetAttenuation,
+  baseIsRoot = false
 }: {
   invocationTarget: string
   baseInvocationTarget: string
   allowTargetAttenuation?: boolean
+  baseIsRoot?: boolean
 }): boolean {
+  if (
+    typeof invocationTarget !== 'string' ||
+    typeof baseInvocationTarget !== 'string'
+  ) {
+    return false
+  }
   // direct match, valid
   if (baseInvocationTarget === invocationTarget) {
     return true
   }
-  if (allowTargetAttenuation) {
-    /* Note: When `allowTargetAttenuation=true`, a zcap can be invoked with
-    a more narrow target and delegated zcap can have a different invocation
-    target from its parent. Here we must ensure that the invocation target
-    has a proper prefix relative to the base one we're comparing against.
-
-    If the `baseInvocationTarget` already has a query (has `?`) then the
-    suffix that follows it must start with `&`. Otherwise, it may start
-    with either `/` or `?`.
-
-    A base that already ends in its own separator (`/` for a path base,
-    `?` or `&` for a query base) is its own boundary prefix: appending
-    another separator would degenerate (`//`, `?&`, `&&`) and match no
-    descendant at all, while the base itself still enforces the same
-    boundary (`/space/abc/` never matches `/space/abc-evil`, and the
-    slashless parent `/space/abc` is still refused). */
-    const prefixes = []
-    if (baseInvocationTarget.includes('?')) {
-      // query already present in base invocation target, so only accept new
-      // variables in the query
-      prefixes.push(
-        baseInvocationTarget.endsWith('?') || baseInvocationTarget.endsWith('&')
-          ? baseInvocationTarget
-          : `${baseInvocationTarget}&`
-      )
-    } else {
-      // accept path-based attenuation or new query-based attenuation
-      prefixes.push(
-        baseInvocationTarget.endsWith('/')
-          ? baseInvocationTarget
-          : `${baseInvocationTarget}/`
-      )
-      prefixes.push(`${baseInvocationTarget}?`)
-    }
-    if (prefixes.some(prefix => invocationTarget.startsWith(prefix))) {
-      return true
-    }
+  // a narrowed target must not rely on dot segments
+  if (!allowTargetAttenuation || hasDotSegments(invocationTarget)) {
+    return false
   }
-  // not a match
-  return false
+  const childIsDid = invocationTarget.startsWith('did:')
+  const baseIsDid = baseInvocationTarget.startsWith('did:')
+  if (childIsDid || baseIsDid) {
+    // no attenuation between a DID URL and anything else
+    return (
+      childIsDid &&
+      baseIsDid &&
+      isValidSelectorTarget({
+        invocationTarget,
+        baseInvocationTarget,
+        baseIsRoot
+      })
+    )
+  }
+  /* Note: When `allowTargetAttenuation=true`, a zcap can be invoked with
+  a more narrow target and delegated zcap can have a different invocation
+  target from its parent. Here we must ensure that the invocation target
+  has a proper prefix relative to the base one we're comparing against.
+
+  If the `baseInvocationTarget` already has a query (has `?`) then the
+  suffix that follows it must start with `&`. Otherwise, it may start
+  with either `/` or `?`.
+
+  A base that already ends in its own separator (`/` for a path base,
+  `?` or `&` for a query base) is its own boundary prefix: appending
+  another separator would degenerate (`//`, `?&`, `&&`) and match no
+  descendant at all, while the base itself still enforces the same
+  boundary (`/space/abc/` never matches `/space/abc-evil`, and the
+  slashless parent `/space/abc` is still refused). */
+  const prefixes = []
+  if (baseInvocationTarget.includes('?')) {
+    // query already present in base invocation target, so only accept new
+    // variables in the query
+    prefixes.push(
+      baseInvocationTarget.endsWith('?') || baseInvocationTarget.endsWith('&')
+        ? baseInvocationTarget
+        : `${baseInvocationTarget}&`
+    )
+  } else {
+    // accept path-based attenuation or new query-based attenuation
+    prefixes.push(
+      baseInvocationTarget.endsWith('/')
+        ? baseInvocationTarget
+        : `${baseInvocationTarget}/`
+    )
+    prefixes.push(`${baseInvocationTarget}?`)
+  }
+  return prefixes.some(prefix => invocationTarget.startsWith(prefix))
+}
+
+/**
+ * Checks a proof's `invocationTarget` against a DID URL capability target
+ * that a `dereferenceTarget` hook mapped to another URI space. The DID URL
+ * rule (path and selectors checked separately) is applied to the mapped
+ * target, so the hook does not weaken it.
+ *
+ * @param options - The options.
+ * @param options.invocationTarget - The proof's invocation target.
+ * @param options.dereferencedTarget - The mapped capability target.
+ * @param options.allowTargetAttenuation - `true` to allow target attenuation.
+ *
+ * @returns `true` if the target is valid, `false` if not.
+ */
+export function isValidDereferencedDidUrlTarget({
+  invocationTarget,
+  dereferencedTarget,
+  allowTargetAttenuation
+}: {
+  invocationTarget: string
+  dereferencedTarget: string
+  allowTargetAttenuation?: boolean
+}): boolean {
+  if (invocationTarget === dereferencedTarget) {
+    return true
+  }
+  if (!allowTargetAttenuation || hasDotSegments(invocationTarget)) {
+    return false
+  }
+  return isValidSelectorTarget({
+    invocationTarget,
+    baseInvocationTarget: dereferencedTarget,
+    baseIsRoot: false
+  })
+}
+
+/**
+ * Splits a target at the first `?` or `#` into a path part and a selector
+ * part. The delimiter stays with the selector part.
+ *
+ * @param target - The target.
+ *
+ * @returns The path part and the selector part ('' if none).
+ */
+function splitTarget(target: string): {
+  path: string
+  selectors: string
+} {
+  const index = target.search(/[?#]/)
+  if (index === -1) {
+    return { path: target, selectors: '' }
+  }
+  return { path: target.slice(0, index), selectors: target.slice(index) }
+}
+
+/**
+ * Checks whether the path part of a target (everything before the first `?`
+ * or `#`) has a `.` or `..` segment. A URL parser removes such segments, so
+ * a target that passes a string prefix check could name a resource outside
+ * its parent. The percent-encoded form (`%2e`) counts as a dot.
+ *
+ * @param target - The target to check.
+ *
+ * @returns `true` if the path part has a dot segment.
+ */
+export function hasDotSegments(target: string): boolean {
+  return splitTarget(target)
+    .path.split('/')
+    .some(segment => {
+      const decoded = segment.replace(/%2e/gi, '.')
+      return decoded === '.' || decoded === '..'
+    })
+}
+
+/**
+ * Checks attenuation with the path and the selectors compared separately
+ * (attenuation allowed, targets not equal). The path parts are compared with
+ * the `/` boundary rule. The selector parts must be identical, except that a
+ * child of the root may add selectors the root does not have.
+ *
+ * @param options - The options.
+ * @param options.invocationTarget - The child target.
+ * @param options.baseInvocationTarget - The base target.
+ * @param options.baseIsRoot - `true` if the base is the root capability's.
+ *
+ * @returns `true` if the child is a valid attenuation of the base.
+ */
+function isValidSelectorTarget({
+  invocationTarget,
+  baseInvocationTarget,
+  baseIsRoot
+}: {
+  invocationTarget: string
+  baseInvocationTarget: string
+  baseIsRoot: boolean
+}): boolean {
+  const child = splitTarget(invocationTarget)
+  const base = splitTarget(baseInvocationTarget)
+  const selectorsOk =
+    child.selectors === base.selectors || (baseIsRoot && base.selectors === '')
+  if (!selectorsOk) {
+    return false
+  }
+  if (child.path === base.path) {
+    return true
+  }
+  const prefix = base.path.endsWith('/') ? base.path : `${base.path}/`
+  return child.path.startsWith(prefix)
 }
 
 /**

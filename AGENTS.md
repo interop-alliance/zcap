@@ -57,8 +57,15 @@ Key invariants enforced at each link:
   may carry `allowedAction` too; the first delegated link is checked against it.
   `allowedAction` is compared as a set of action strings, whether expressed as a
   string or an array.
-- `invocationTarget` must match the parent's exactly (unless
-  `allowTargetAttenuation=true`, where URL path/query narrowing is allowed).
+- `invocationTarget` must match the parent's exactly, unless
+  `allowTargetAttenuation=true`. Then a target that does not start with `did:`
+  may be narrowed by path or by added query parameters. A `did:` target is split
+  at its first `?` or `#`. Its path may be narrowed at a `/` boundary and its
+  selector part must stay identical. Only the link directly beneath the root may
+  add a selector part (`baseIsRoot`). An invocation may narrow the path but must
+  keep the selectors, also after a `dereferenceTarget` mapping. A narrowed
+  target with a `.` or `..` path segment is always refused. The delegation is
+  also checked at signing time when the parent is an object.
 - `expires` may only be made earlier, never later.
 - Delegation timestamp must not be before the parent's delegation timestamp.
 - Chain must not contain cycles.
@@ -94,7 +101,8 @@ src/
                             new zcap against its parent before signing
   utils.ts                  Pure helpers: createRootCapability,
                             dereferenceCapabilityChain, checkCapability,
-                            computeCapabilityChain, isValidTarget, isAbsoluteUri,
+                            computeCapabilityChain, isValidTarget, hasDotSegments,
+                            isValidDereferencedDidUrlTarget, isAbsoluteUri,
                             getAllowedActions, getCaveats, getDelegationProofs,
                             compareTime; also the error classes
 ```
@@ -107,7 +115,8 @@ import {
   CapabilityDelegation, // proof purpose — used when delegating a zcap
   createRootCapability, // ({controller, invocationTarget}) => zcap object
   checkCapability, // structural check of a root or delegated zcap (throws)
-  isValidTarget, // invocation-target prefix check (allowTargetAttenuation)
+  isValidTarget, // target attenuation check (prefix rule, or path and
+  // selectors for did: targets; optional `baseIsRoot`)
   CapabilityExpiredError, // Error subclass (name 'CapabilityExpiredError')
   // thrown by every expiry check; match on `name`, not `instanceof`
   UnsupportedCaveatError, // a zcap in the chain carries a caveat with no handler

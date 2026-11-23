@@ -383,6 +383,153 @@ describe('utils', () => {
     })
   })
 
+  describe('isValidTarget with DID URL targets', () => {
+    const did = 'did:webvh:abc123:alice.example'
+    const ok = (
+      invocationTarget: string,
+      baseInvocationTarget: string,
+      extra: { baseIsRoot?: boolean; allowTargetAttenuation?: boolean } = {
+        allowTargetAttenuation: true
+      }
+    ) => isValidTarget({ invocationTarget, baseInvocationTarget, ...extra })
+
+    it('accepts path narrowing with identical selectors', () => {
+      expect(
+        ok(`${did}/photos/2024?versionId=3`, `${did}/photos?versionId=3`)
+      ).toBe(true)
+    })
+
+    it('accepts path narrowing with no selectors', () => {
+      expect(ok(`${did}/photos/2024`, `${did}/photos/`)).toBe(true)
+      expect(ok(`${did}/photos/2024`, `${did}/photos`)).toBe(true)
+    })
+
+    it('refuses a selector added under a non-root parent', () => {
+      expect(ok(`${did}/photos?versionId=3`, `${did}/photos`)).toBe(false)
+      expect(
+        ok(`${did}/photos?versionId=3`, `${did}/photos`, {
+          allowTargetAttenuation: true,
+          baseIsRoot: false
+        })
+      ).toBe(false)
+    })
+
+    it('accepts a selector added directly beneath the root', () => {
+      const extra = { allowTargetAttenuation: true, baseIsRoot: true }
+      expect(ok(`${did}/photos?versionId=3`, `${did}/photos`, extra)).toBe(true)
+      expect(ok(`${did}/photos/a?versionId=3`, `${did}/photos`, extra)).toBe(
+        true
+      )
+      expect(ok(`${did}/photos#key-1`, `${did}/photos`, extra)).toBe(true)
+    })
+
+    it('refuses a changed selector value, even under the root', () => {
+      const extra = { allowTargetAttenuation: true, baseIsRoot: true }
+      expect(
+        ok(`${did}/photos?versionId=4`, `${did}/photos?versionId=3`, extra)
+      ).toBe(false)
+    })
+
+    it('refuses a dropped selector', () => {
+      expect(ok(`${did}/photos/a`, `${did}/photos?versionId=3`)).toBe(false)
+    })
+
+    it('refuses reordered or extended selectors', () => {
+      expect(ok(`${did}/photos?b=2&a=1`, `${did}/photos?a=1&b=2`)).toBe(false)
+      expect(ok(`${did}/photos?a=1&b=2`, `${did}/photos?a=1`)).toBe(false)
+    })
+
+    it('treats a fragment as part of the selectors', () => {
+      expect(ok(`${did}/photos/a#k`, `${did}/photos#k`)).toBe(true)
+      expect(ok(`${did}/photos/a#j`, `${did}/photos#k`)).toBe(false)
+    })
+
+    it('keeps the "/" segment boundary', () => {
+      expect(ok(`${did}/photos-evil/`, `${did}/photos`)).toBe(false)
+      expect(ok(`${did}/photos-evil/`, `${did}/photos/`)).toBe(false)
+    })
+
+    it('does not extend the path with "?" attenuation', () => {
+      expect(ok(`${did}/photos/a?x=1`, `${did}/photos?x=1&`)).toBe(false)
+      expect(ok(`${did}/photosx?x=1`, `${did}/photos?x=1`)).toBe(false)
+    })
+
+    it('refuses mixed did and https pairs', () => {
+      expect(ok('https://alice.example/photos/a', `${did}/photos`)).toBe(false)
+      expect(ok(`${did}/photos/a`, 'https://alice.example/photos')).toBe(false)
+      expect(
+        ok('https://alice.example/photos/a', `${did}/photos`, {
+          allowTargetAttenuation: true,
+          baseIsRoot: true
+        })
+      ).toBe(false)
+    })
+
+    it('requires exact equality without attenuation', () => {
+      expect(ok(`${did}/photos`, `${did}/photos`, {})).toBe(true)
+      expect(ok(`${did}/photos/a`, `${did}/photos`, {})).toBe(false)
+      expect(
+        ok(`${did}/photos?versionId=3`, `${did}/photos`, { baseIsRoot: true })
+      ).toBe(false)
+    })
+
+    it('leaves https targets with a query base unchanged', () => {
+      const extra = { allowTargetAttenuation: true, baseIsRoot: true }
+      expect(
+        ok('https://a.example/p/x?v=1', 'https://a.example/p?v=1', extra)
+      ).toBe(false)
+      expect(
+        ok('https://a.example/p?v=1&w=2', 'https://a.example/p?v=1', extra)
+      ).toBe(true)
+      expect(ok('https://a.example/p?v=1', 'https://a.example/p', extra)).toBe(
+        true
+      )
+    })
+  })
+
+  describe('isValidTarget input checks', () => {
+    it('refuses a narrowed target with a dot segment', () => {
+      const check = (invocationTarget: string, baseInvocationTarget: string) =>
+        isValidTarget({
+          invocationTarget,
+          baseInvocationTarget,
+          allowTargetAttenuation: true
+        })
+      const did = 'did:webvh:abc123:alice.example'
+      expect(check(`${did}/photos/../private`, `${did}/photos`)).toBe(false)
+      expect(check(`${did}/photos/./a`, `${did}/photos`)).toBe(false)
+      expect(check(`${did}/photos/%2E%2e/private`, `${did}/photos`)).toBe(false)
+      expect(
+        check('https://a.example/p/../private', 'https://a.example/p')
+      ).toBe(false)
+      expect(check('https://a.example/p/..', 'https://a.example/p')).toBe(false)
+      // dots inside a segment or in the query are fine
+      expect(check('https://a.example/p/a..b', 'https://a.example/p')).toBe(
+        true
+      )
+      expect(check('https://a.example/p?x=../y', 'https://a.example/p')).toBe(
+        true
+      )
+    })
+
+    it('returns false for a non-string target', () => {
+      const base = 'https://a.example/p'
+      expect(
+        isValidTarget({
+          invocationTarget: undefined as unknown as string,
+          baseInvocationTarget: base
+        })
+      ).toBe(false)
+      expect(
+        isValidTarget({
+          invocationTarget: base,
+          baseInvocationTarget: undefined as unknown as string,
+          allowTargetAttenuation: true
+        })
+      ).toBe(false)
+    })
+  })
+
   describe('computeCapabilityChain', () => {
     const rootId =
       'urn:zcap:root:' + encodeURIComponent('https://example.com/foo')

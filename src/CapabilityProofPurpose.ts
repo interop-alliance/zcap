@@ -758,7 +758,9 @@ export class CapabilityProofPurpose extends ControllerProofPurpose {
           !utils.isValidTarget({
             invocationTarget,
             baseInvocationTarget: parentInvocationTarget,
-            allowTargetAttenuation
+            allowTargetAttenuation,
+            // the first delegated link's parent is the chain's root
+            baseIsRoot: i === 0
           })
         ) {
           if (allowTargetAttenuation) {
